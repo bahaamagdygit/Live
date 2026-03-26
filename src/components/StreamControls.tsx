@@ -59,10 +59,10 @@ export function StreamControls({
           <button
             className="btn btn--icon btn--toolbar"
             onClick={onOpenPptx}
-            title="Open PPTX"
+            title="Open File"
           >
             <span className="btn-icon">📄</span>
-            <span className="btn-label">Open PPTX</span>
+            <span className="btn-label">Open File</span>
           </button>
         </div>
 

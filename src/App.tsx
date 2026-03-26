@@ -391,6 +391,7 @@ function App() {
 
         <div className="app-header__actions">
           <button
+            type="button"
             className="btn btn--ghost btn--sm"
             onClick={() => setIsSettingsOpen(true)}
             title="Settings"
@@ -436,7 +437,12 @@ function App() {
             <div className="pptx-launcher__body">
               {slides.pptxFileName ? (
                 <div className="pptx-launcher__loaded">
-                  <div className="pptx-launcher__file-icon">📂</div>
+                  <div className="pptx-launcher__file-icon">
+                    {slides.fileType === 'pdf' ? '📕' :
+                     slides.fileType === 'docx' || slides.fileType === 'doc' ? '📝' :
+                     slides.fileType === 'xlsx' || slides.fileType === 'xls' ? '📊' :
+                     '📊'}
+                  </div>
                   <div className="pptx-launcher__file-name" title={slides.pptxFileName}>
                     {slides.pptxFileName}
                   </div>
@@ -465,7 +471,7 @@ function App() {
                 className="pptx-launcher__btn pptx-launcher__btn--secondary"
                 onClick={slides.openPptx}
               >
-                📂 Open PPTX
+                📂 Open File
               </button>
 
               <button

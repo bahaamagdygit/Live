@@ -73,8 +73,8 @@ export function SlidesPanel({
           Slides
         </h3>
         <div className="slides-panel__header-actions">
-          <button type="button" className="btn btn--primary btn--sm" onClick={onOpenPptx} title="Open PPTX file">
-            Open PPTX
+          <button type="button" className="btn btn--primary btn--sm" onClick={onOpenPptx} title="Open File file">
+            Open File
           </button>
           {onTogglePresentation && (
             <button
@@ -116,8 +116,8 @@ export function SlidesPanel({
             <div className="empty-state__icon">📊</div>
             <p>No slides loaded</p>
             <p className="empty-state__hint">Open a PowerPoint file to display liturgical text</p>
-            <button className="btn btn--primary" onClick={onOpenPptx}>
-              Open PPTX File
+            <button type="button" className="btn btn--primary" onClick={onOpenPptx}>
+              Open File
             </button>
           </div>
         )}

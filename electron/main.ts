@@ -15,6 +15,8 @@ import AdmZip from 'adm-zip'
 // We use dynamic require for electron-store and officeparser to avoid ESM issues
 let Store: any
 let officeParser: any
+let pdfParse: any
+let mammoth: any
 
 async function loadModules() {
   try {
@@ -28,6 +30,18 @@ async function loadModules() {
     officeParser = parserModule.default || parserModule
   } catch (e) {
     console.error('Failed to load officeparser:', e)
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    pdfParse = require('pdf-parse')
+  } catch (e) {
+    console.error('Failed to load pdf-parse:', e)
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    mammoth = require('mammoth')
+  } catch (e) {
+    console.error('Failed to load mammoth:', e)
   }
 }
 
@@ -209,13 +223,23 @@ ipcMain.handle('get-cameras', async () => {
   }
 })
 
-// Open and parse PPTX file
+// Open and parse any supported document file
 ipcMain.handle('open-pptx', async () => {
   if (!mainWindow) return { success: false, error: 'No window' }
 
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Open PPTX File',
-    filters: [{ name: 'PowerPoint Files', extensions: ['pptx', 'ppt'] }],
+    title: 'Open Document',
+    filters: [
+      {
+        name: 'All Supported Files',
+        extensions: ['pptx', 'ppt', 'pdf', 'docx', 'doc', 'xlsx', 'xls', 'odp', 'odt', 'ods'],
+      },
+      { name: 'PowerPoint', extensions: ['pptx', 'ppt'] },
+      { name: 'PDF', extensions: ['pdf'] },
+      { name: 'Word', extensions: ['docx', 'doc'] },
+      { name: 'Excel', extensions: ['xlsx', 'xls'] },
+      { name: 'OpenDocument', extensions: ['odp', 'odt', 'ods'] },
+    ],
     properties: ['openFile'],
   })
 
@@ -224,17 +248,26 @@ ipcMain.handle('open-pptx', async () => {
   }
 
   const filePath = result.filePaths[0]
+  const ext = path.extname(filePath).toLowerCase().slice(1)
 
   try {
-    if (!officeParser) {
-      return { success: false, error: 'officeparser module not available' }
+    let slides: any[] = []
+
+    if (ext === 'pptx' || ext === 'ppt') {
+      slides = await parsePptxSlides(filePath)
+    } else if (ext === 'pdf') {
+      slides = await parsePdfFile(filePath)
+    } else if (ext === 'docx' || ext === 'doc') {
+      slides = await parseWordFile(filePath)
+    } else if (ext === 'xlsx' || ext === 'xls' || ext === 'odp' || ext === 'odt' || ext === 'ods') {
+      slides = await parseWithOfficeParser(filePath)
+    } else {
+      return { success: false, error: `Unsupported file type: .${ext}` }
     }
 
-    // officeparser returns all text; we do slide-by-slide by reading raw XML
-    const slides = await parsePptxSlides(filePath)
-    return { success: true, slides, filePath }
+    return { success: true, slides, filePath, fileType: ext }
   } catch (err: any) {
-    console.error('PPTX parse error:', err)
+    console.error('File parse error:', err)
     return { success: false, error: err.message }
   }
 })
@@ -345,6 +378,74 @@ async function parseWithOfficeParser(filePath: string): Promise<any[]> {
       resolve(slides.length > 0 ? slides : [{ index: 0, text: ['No text found'], slideNumber: 1 }])
     })
   })
+}
+
+// Parse PDF — each page becomes a "slide"
+async function parsePdfFile(filePath: string): Promise<any[]> {
+  if (!pdfParse) {
+    return [{ index: 0, text: ['pdf-parse not available'], slideNumber: 1, section: 'PDF' }]
+  }
+  try {
+    const buffer = fs.readFileSync(filePath)
+    const data = await pdfParse(buffer)
+
+    // Split by form-feed (\f) if present (page breaks), else by double newlines
+    const rawPages: string[] = data.text.includes('\f')
+      ? data.text.split('\f')
+      : data.text.split(/\n{3,}/)
+
+    const pages = rawPages
+      .map((p: string) => p.trim())
+      .filter((p: string) => p.length > 0)
+
+    if (pages.length === 0) {
+      return [{ index: 0, text: ['No text found in PDF'], slideNumber: 1, section: 'PDF' }]
+    }
+
+    return pages.map((page: string, idx: number) => ({
+      index: idx,
+      slideNumber: idx + 1,
+      section: `Page ${idx + 1}`,
+      text: page.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0),
+    }))
+  } catch (err: any) {
+    return [{ index: 0, text: [`Error reading PDF: ${err.message}`], slideNumber: 1, section: 'PDF' }]
+  }
+}
+
+// Parse Word DOC/DOCX — split by headings or paragraphs into slides
+async function parseWordFile(filePath: string): Promise<any[]> {
+  if (!mammoth) {
+    return [{ index: 0, text: ['mammoth not available'], slideNumber: 1, section: 'Word' }]
+  }
+  try {
+    const result = await mammoth.extractRawText({ path: filePath })
+    const fullText: string = result.value
+
+    // Split into sections by heading-like breaks (lines followed by blank lines)
+    // or every N lines as a "slide"
+    const lines = fullText.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+
+    if (lines.length === 0) {
+      return [{ index: 0, text: ['No text found in document'], slideNumber: 1, section: 'Word' }]
+    }
+
+    // Group every 8 lines into one "slide"
+    const LINES_PER_SLIDE = 8
+    const chunks: string[][] = []
+    for (let i = 0; i < lines.length; i += LINES_PER_SLIDE) {
+      chunks.push(lines.slice(i, i + LINES_PER_SLIDE))
+    }
+
+    return chunks.map((chunk: string[], idx: number) => ({
+      index: idx,
+      slideNumber: idx + 1,
+      section: idx === 0 ? 'Start' : `Part ${idx + 1}`,
+      text: chunk,
+    }))
+  } catch (err: any) {
+    return [{ index: 0, text: [`Error reading Word file: ${err.message}`], slideNumber: 1, section: 'Word' }]
+  }
 }
 
 // Find FFmpeg executable

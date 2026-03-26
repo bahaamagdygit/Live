@@ -32,7 +32,6 @@ export default function PptxControllerApp() {
   const [isLoading, setIsLoading] = useState(false)
   const activeSlideRef = useRef<HTMLDivElement>(null)
 
-  // Receive slides from main window
   useEffect(() => {
     if (!window.electronAPI?.onSlidesData) return
     const cleanup = window.electronAPI.onSlidesData((data: SlidesData) => {
@@ -45,7 +44,6 @@ export default function PptxControllerApp() {
     return cleanup
   }, [])
 
-  // Sync current slide index when main changes it
   useEffect(() => {
     if (!window.electronAPI?.onSlideIndexChanged) return
     const cleanup = window.electronAPI.onSlideIndexChanged((index: number) => {
@@ -54,12 +52,10 @@ export default function PptxControllerApp() {
     return cleanup
   }, [])
 
-  // Scroll active slide into view
   useEffect(() => {
     activeSlideRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [currentIndex])
 
-  // Keyboard navigation
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
@@ -91,7 +87,6 @@ export default function PptxControllerApp() {
   const handleOpenPptx = useCallback(async () => {
     setIsLoading(true)
     await window.electronAPI?.controllerOpenPptx()
-    // Main window will handle the dialog and send back slides-data
     setTimeout(() => setIsLoading(false), 3000)
   }, [])
 
@@ -105,18 +100,17 @@ export default function PptxControllerApp() {
 
   return (
     <div className="ctrl-root">
-      {/* Header */}
       <header className="ctrl-header">
         <div className="ctrl-header__title">
           <span className="ctrl-header__icon">📊</span>
           <div>
-            <div className="ctrl-header__name">PowerPoint Controller</div>
+            <div className="ctrl-header__name">File Controller</div>
             {fileName && <div className="ctrl-header__file">{fileName}</div>}
           </div>
         </div>
         <div className="ctrl-header__actions">
-          <button className="ctrl-btn ctrl-btn--primary" onClick={handleOpenPptx} disabled={isLoading}>
-            {isLoading ? 'Loading...' : '📂 Open PPTX'}
+          <button type="button" className="ctrl-btn ctrl-btn--primary" onClick={handleOpenPptx} disabled={isLoading}>
+            {isLoading ? 'Loading...' : '📂 Open File'}
           </button>
         </div>
       </header>
@@ -124,20 +118,19 @@ export default function PptxControllerApp() {
       {slides.length === 0 ? (
         <div className="ctrl-empty">
           <div className="ctrl-empty__icon">📊</div>
-          <p className="ctrl-empty__title">No Presentation Loaded</p>
-          <p className="ctrl-empty__hint">Open a PowerPoint file to get started</p>
-          <button className="ctrl-btn ctrl-btn--primary ctrl-btn--lg" onClick={handleOpenPptx}>
-            📂 Open PPTX File
+          <p className="ctrl-empty__title">No File Loaded</p>
+          <p className="ctrl-empty__hint">Open a PPTX, PDF, or Word file to get started</p>
+          <button type="button" className="ctrl-btn ctrl-btn--primary ctrl-btn--lg" onClick={handleOpenPptx}>
+            📂 Open File
           </button>
         </div>
       ) : (
         <div className="ctrl-body">
-          {/* Left: Sections + Slides */}
           <div className="ctrl-left">
-            {/* Section tabs */}
             {sections.length > 1 && (
               <div className="ctrl-sections">
                 <button
+                  type="button"
                   className={`ctrl-section-tab ${activeSection === null ? 'ctrl-section-tab--active' : ''}`}
                   onClick={() => setActiveSection(null)}
                 >
@@ -145,6 +138,7 @@ export default function PptxControllerApp() {
                 </button>
                 {sections.map(sec => (
                   <button
+                    type="button"
                     key={sec.name}
                     className={`ctrl-section-tab ${activeSection === sec.name ? 'ctrl-section-tab--active' : ''}`}
                     onClick={() => setActiveSection(sec.name)}
@@ -156,7 +150,6 @@ export default function PptxControllerApp() {
               </div>
             )}
 
-            {/* Slides grid */}
             <div className="ctrl-slides">
               {visibleSlides.map((slide) => {
                 const isActive = slide.index === currentIndex
@@ -184,15 +177,11 @@ export default function PptxControllerApp() {
             </div>
           </div>
 
-          {/* Right: Current slide preview + controls */}
           <div className="ctrl-right">
             <div className="ctrl-preview">
               <div className="ctrl-preview__label">Current Slide</div>
               <div className="ctrl-preview__screen">
-                <div
-                  className="ctrl-preview__text"
-                  dir={isRtl(currentText) ? 'rtl' : 'ltr'}
-                >
+                <div className="ctrl-preview__text" dir={isRtl(currentText) ? 'rtl' : 'ltr'}>
                   {currentSlide?.text.map((line, i) => (
                     <div key={i} className="ctrl-preview__line">{line}</div>
                   )) || <span className="ctrl-preview__empty">No text</span>}
@@ -206,9 +195,9 @@ export default function PptxControllerApp() {
               </div>
             </div>
 
-            {/* Show / Hide controls */}
             <div className="ctrl-text-controls">
               <button
+                type="button"
                 className={`ctrl-show-btn ${textVisible ? 'ctrl-show-btn--active' : ''}`}
                 onClick={() => handleToggleText(!textVisible)}
               >
@@ -217,9 +206,9 @@ export default function PptxControllerApp() {
               </button>
             </div>
 
-            {/* Navigation */}
             <div className="ctrl-nav">
               <button
+                type="button"
                 className="ctrl-nav-btn"
                 onClick={() => handleSelectSlide(Math.max(currentIndex - 1, 0))}
                 disabled={currentIndex === 0}
@@ -230,6 +219,7 @@ export default function PptxControllerApp() {
                 {currentIndex + 1} / {slides.length}
               </span>
               <button
+                type="button"
                 className="ctrl-nav-btn"
                 onClick={() => handleSelectSlide(Math.min(currentIndex + 1, slides.length - 1))}
                 disabled={currentIndex === slides.length - 1}
@@ -238,7 +228,6 @@ export default function PptxControllerApp() {
               </button>
             </div>
 
-            {/* Keyboard hints */}
             <div className="ctrl-hints">
               <span>← → Navigate</span>
               <span>Space: Show/Hide</span>

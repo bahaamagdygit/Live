@@ -22,7 +22,7 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['electron', 'electron-store', 'officeparser', 'adm-zip', 'child_process', 'fs', 'path', 'os'],
+              external: ['electron', 'electron-store', 'officeparser', 'adm-zip', 'pdf-parse', 'mammoth', 'child_process', 'fs', 'path', 'os'],
             },
           },
         },

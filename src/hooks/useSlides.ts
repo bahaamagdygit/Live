@@ -8,6 +8,7 @@ interface UseSlidesReturn {
   isLoading: boolean
   error: string | null
   pptxFileName: string
+  fileType: string
   openPptx: () => Promise<void>
   goToSlide: (index: number) => void
   nextSlide: () => void
@@ -21,6 +22,7 @@ export function useSlides(): UseSlidesReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pptxFileName, setPptxFileName] = useState('')
+  const [fileType, setFileType] = useState('')
 
   const openPptx = useCallback(async () => {
     if (!window.electronAPI) return
@@ -43,6 +45,9 @@ export function useSlides(): UseSlidesReturn {
       if (result.filePath) {
         const parts = result.filePath.replace(/\\/g, '/').split('/')
         setPptxFileName(parts[parts.length - 1])
+      }
+      if ((result as any).fileType) {
+        setFileType((result as any).fileType)
       }
     } catch (err: any) {
       setError(err.message || 'Unknown error opening PPTX')
@@ -84,6 +89,7 @@ export function useSlides(): UseSlidesReturn {
     isLoading,
     error,
     pptxFileName,
+    fileType,
     openPptx,
     goToSlide,
     nextSlide,
