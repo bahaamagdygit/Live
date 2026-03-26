@@ -1,0 +1,62 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #presentation-root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  cursor: none;
+}
+
+.presentation-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  overflow: hidden;
+}
+
+.presentation-bg {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+.presentation-overlay {
+  position: absolute;
+  z-index: 10;
+  width: 100%;
+  pointer-events: none;
+  transition: opacity 0s; /* handled by JS */
+}
+
+.presentation-text-box {
+  display: inline-block;
+  width: 100%;
+  border-radius: 4px;
+}
+
+.presentation-line {
+  font-weight: 600;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+  padding: 0.1em 0;
+  letter-spacing: 0.02em;
+}
+
+.presentation-counter {
+  position: absolute;
+  bottom: 16px;
+  right: 24px;
+  color: rgba(255, 255, 255, 0.35);
+  font-family: Arial, sans-serif;
+  font-size: 18px;
+  z-index: 20;
+  pointer-events: none;
+  user-select: none;
+}
