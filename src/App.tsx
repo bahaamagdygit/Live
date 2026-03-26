@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { CameraPanel } from './components/CameraPanel'
 import { MainPreview } from './components/MainPreview'
-import { SlidesPanel } from './components/SlidesPanel'
 import { TextControls } from './components/TextControls'
 import { StreamControls } from './components/StreamControls'
 import { SettingsModal } from './components/SettingsModal'
@@ -56,6 +55,8 @@ function App() {
   const [logoSettings, setLogoSettings] = useState<LogoSettings>(DEFAULT_SETTINGS.logoSettings)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false)
+  const [isPptxControllerOpen, setIsPptxControllerOpen] = useState(false)
 
   const cameras = useCameras()
   const stream = useStream()
@@ -172,6 +173,117 @@ function App() {
     const text = slides.getCurrentText()
     setOverlaySettings((prev) => ({ ...prev, text }))
   }, [slides.currentSlideIndex, slides.slides])
+
+  // Listen for presentation window being closed externally
+  useEffect(() => {
+    if (!window.electronAPI?.onPresentationWindowClosed) return
+    const cleanup = window.electronAPI.onPresentationWindowClosed(() => {
+      setIsPresentationOpen(false)
+    })
+    return cleanup
+  }, [])
+
+  // Push overlay state to presentation window whenever it changes
+  useEffect(() => {
+    if (!isPresentationOpen || !window.electronAPI?.updatePresentation) return
+    window.electronAPI.updatePresentation({
+      ...overlaySettings,
+      slideNumber: slides.currentSlideIndex + 1,
+      totalSlides: slides.slides.length,
+    })
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length])
+
+  // ── PPTX Controller window ──────────────────────────────────────────────────
+
+  // Listen for controller window being closed
+  useEffect(() => {
+    if (!window.electronAPI?.onPptxControllerClosed) return
+    const cleanup = window.electronAPI.onPptxControllerClosed(() => {
+      setIsPptxControllerOpen(false)
+    })
+    return cleanup
+  }, [])
+
+  // Listen for remote commands from the controller window
+  useEffect(() => {
+    if (!window.electronAPI?.onRemoteSelectSlide) return
+    const cleanup = window.electronAPI.onRemoteSelectSlide((index: number) => {
+      slides.goToSlide(index)
+    })
+    return cleanup
+  }, [slides.goToSlide])
+
+  useEffect(() => {
+    if (!window.electronAPI?.onRemoteToggleText) return
+    const cleanup = window.electronAPI.onRemoteToggleText((visible: boolean) => {
+      setOverlaySettings((prev) => ({ ...prev, visible }))
+    })
+    return cleanup
+  }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI?.onRemoteOpenPptx) return
+    const cleanup = window.electronAPI.onRemoteOpenPptx(() => {
+      slides.openPptx()
+    })
+    return cleanup
+  }, [slides.openPptx])
+
+  // Push slides data to controller whenever slides change
+  useEffect(() => {
+    if (!isPptxControllerOpen || !window.electronAPI?.sendSlidesToController) return
+    window.electronAPI.sendSlidesToController({
+      slides: slides.slides,
+      fileName: slides.pptxFileName,
+      currentIndex: slides.currentSlideIndex,
+      textVisible: overlaySettings.visible,
+    })
+  }, [isPptxControllerOpen, slides.slides, slides.pptxFileName])
+
+  // Sync current slide index to controller on change
+  useEffect(() => {
+    if (!isPptxControllerOpen || !window.electronAPI?.syncSlideToController) return
+    window.electronAPI.syncSlideToController(slides.currentSlideIndex)
+  }, [isPptxControllerOpen, slides.currentSlideIndex])
+
+  const handleTogglePptxController = useCallback(async () => {
+    if (!window.electronAPI) return
+    if (isPptxControllerOpen) {
+      await window.electronAPI.closePptxController()
+      setIsPptxControllerOpen(false)
+    } else {
+      const result = await window.electronAPI.openPptxController()
+      if (result?.success) {
+        setIsPptxControllerOpen(true)
+        // Push current slides immediately
+        window.electronAPI.sendSlidesToController({
+          slides: slides.slides,
+          fileName: slides.pptxFileName,
+          currentIndex: slides.currentSlideIndex,
+          textVisible: overlaySettings.visible,
+        })
+      }
+    }
+  }, [isPptxControllerOpen, slides.slides, slides.pptxFileName, slides.currentSlideIndex, overlaySettings.visible])
+
+  const handleTogglePresentation = useCallback(async () => {
+    if (!window.electronAPI) return
+    if (isPresentationOpen) {
+      await window.electronAPI.closePresentationWindow()
+      setIsPresentationOpen(false)
+    } else {
+      const result = await window.electronAPI.openPresentationWindow()
+      if (result?.success) {
+        setIsPresentationOpen(true)
+        // Send current state immediately
+        window.electronAPI.updatePresentation({
+          ...overlaySettings,
+          slideNumber: slides.currentSlideIndex + 1,
+          totalSlides: slides.slides.length,
+        })
+      }
+    }
+  }, [isPresentationOpen, overlaySettings, slides.currentSlideIndex, slides.slides.length])
 
   const handleToggleText = useCallback(() => {
     setOverlaySettings((prev) => ({ ...prev, visible: !prev.visible }))
@@ -312,17 +424,59 @@ function App() {
           />
         </div>
 
-        {/* Right: Slides Panel */}
+        {/* Right: PowerPoint controller launcher */}
         <div className="app-main__right">
-          <SlidesPanel
-            slides={slides.slides}
-            currentSlideIndex={slides.currentSlideIndex}
-            onSelectSlide={slides.goToSlide}
-            onOpenPptx={slides.openPptx}
-            isLoading={slides.isLoading}
-            error={slides.error}
-            pptxFileName={slides.pptxFileName}
-          />
+          <div className="panel pptx-launcher">
+            <div className="panel__header">
+              <h3 className="panel__title">
+                <span className="panel__title-icon">📊</span>
+                PowerPoint
+              </h3>
+            </div>
+            <div className="pptx-launcher__body">
+              {slides.pptxFileName ? (
+                <div className="pptx-launcher__loaded">
+                  <div className="pptx-launcher__file-icon">📂</div>
+                  <div className="pptx-launcher__file-name" title={slides.pptxFileName}>
+                    {slides.pptxFileName}
+                  </div>
+                  <div className="pptx-launcher__count">{slides.slides.length} slides</div>
+                  <div className="pptx-launcher__current">
+                    Slide {slides.currentSlideIndex + 1} / {slides.slides.length}
+                  </div>
+                </div>
+              ) : (
+                <div className="pptx-launcher__empty">
+                  <div className="pptx-launcher__empty-icon">📊</div>
+                  <p>No presentation loaded</p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className={`pptx-launcher__btn ${isPptxControllerOpen ? 'pptx-launcher__btn--open' : ''}`}
+                onClick={handleTogglePptxController}
+              >
+                {isPptxControllerOpen ? '✕ Close Controller' : '🖥 Open Controller'}
+              </button>
+
+              <button
+                type="button"
+                className="pptx-launcher__btn pptx-launcher__btn--secondary"
+                onClick={slides.openPptx}
+              >
+                📂 Open PPTX
+              </button>
+
+              <button
+                type="button"
+                className={`pptx-launcher__btn ${isPresentationOpen ? 'pptx-launcher__btn--live' : 'pptx-launcher__btn--present'}`}
+                onClick={handleTogglePresentation}
+              >
+                {isPresentationOpen ? '✕ Close Screen' : '🖥 Present'}
+              </button>
+            </div>
+          </div>
         </div>
       </main>
 

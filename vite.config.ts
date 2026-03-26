@@ -9,6 +9,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         presentation: path.resolve(__dirname, 'presentation.html'),
+        'pptx-controller': path.resolve(__dirname, 'pptx-controller.html'),
       },
     },
   },
@@ -21,7 +22,7 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['electron', 'electron-store', 'officeparser', 'child_process', 'fs', 'path', 'os'],
+              external: ['electron', 'electron-store', 'officeparser', 'adm-zip', 'child_process', 'fs', 'path', 'os'],
             },
           },
         },

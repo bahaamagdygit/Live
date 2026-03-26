@@ -62,9 +62,9 @@ export function useCameras(): UseCamerasReturn {
 
       setCameras(merged)
 
-      // Auto-select first camera if none selected
+      // Auto-select first camera if none selected (don't let stream errors block the list)
       if (merged.length > 0 && !activeCamera) {
-        await selectCameraById(merged[0])
+        selectCameraById(merged[0]).catch((e) => console.warn('Auto-select camera failed:', e))
       }
     } catch (err: any) {
       setCameraError(err.message || 'Failed to enumerate cameras')
@@ -86,32 +86,32 @@ export function useCameras(): UseCamerasReturn {
       stopCurrentStream()
       setCameraError(null)
 
-      try {
-        const constraints: MediaStreamConstraints = {
-          video:
-            camera.deviceId && camera.deviceId !== camera.id
-              ? { deviceId: { exact: camera.deviceId } }
-              : true,
-          audio: false,
-        }
+      // Build a list of constraints to try in order
+      const attempts: MediaStreamConstraints[] = []
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints)
-        streamRef.current = stream
-        setActiveCameraStream(stream)
-        setActiveCamera(camera)
-      } catch (err: any) {
-        // Try without exact constraint
+      // 1. Ideal (non-exact) deviceId — avoids "device not found" errors
+      if (camera.deviceId && camera.deviceId.length > 5) {
+        attempts.push({ video: { deviceId: { ideal: camera.deviceId } }, audio: false })
+      }
+      // 2. Plain video: true — just grab any available camera
+      attempts.push({ video: true, audio: false })
+
+      let lastErr: any = null
+      for (const constraints of attempts) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+          const stream = await navigator.mediaDevices.getUserMedia(constraints)
           streamRef.current = stream
           setActiveCameraStream(stream)
           setActiveCamera(camera)
-        } catch (fallbackErr: any) {
-          setCameraError(
-            `Cannot access camera: ${err.message}. Make sure camera permissions are granted.`
-          )
+          return
+        } catch (err: any) {
+          lastErr = err
         }
       }
+
+      setCameraError(
+        `Cannot access camera: ${lastErr?.message || 'Unknown error'}. Make sure camera permissions are granted.`
+      )
     },
     [stopCurrentStream]
   )

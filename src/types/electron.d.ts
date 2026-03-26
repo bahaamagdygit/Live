@@ -36,6 +36,20 @@ interface ElectronAPI {
   setPresentationFullscreen: (enable: boolean) => Promise<{ success: boolean }>
   onPresentationUpdate: (callback: (data: any) => void) => () => void
   onPresentationWindowClosed: (callback: () => void) => () => void
+  // PPTX Controller window
+  openPptxController: () => Promise<{ success: boolean; alreadyOpen?: boolean }>
+  closePptxController: () => Promise<{ success: boolean }>
+  sendSlidesToController: (data: any) => Promise<{ success: boolean }>
+  syncSlideToController: (index: number) => Promise<{ success: boolean }>
+  controllerSelectSlide: (index: number) => Promise<{ success: boolean }>
+  controllerToggleText: (visible: boolean) => Promise<{ success: boolean }>
+  controllerOpenPptx: () => Promise<{ success: boolean }>
+  onSlidesData: (callback: (data: any) => void) => () => void
+  onSlideIndexChanged: (callback: (index: number) => void) => () => void
+  onRemoteSelectSlide: (callback: (index: number) => void) => () => void
+  onRemoteToggleText: (callback: (visible: boolean) => void) => () => void
+  onRemoteOpenPptx: (callback: () => void) => () => void
+  onPptxControllerClosed: (callback: () => void) => () => void
 }
 
 declare global {

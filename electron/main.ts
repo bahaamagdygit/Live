@@ -10,6 +10,7 @@ import path from 'path'
 import fs from 'fs'
 import { spawn, ChildProcess } from 'child_process'
 import { execSync } from 'child_process'
+import AdmZip from 'adm-zip'
 
 // We use dynamic require for electron-store and officeparser to avoid ESM issues
 let Store: any
@@ -33,6 +34,7 @@ async function loadModules() {
 let store: any = null
 let mainWindow: BrowserWindow | null = null
 let presentationWindow: BrowserWindow | null = null
+let pptxControllerWindow: BrowserWindow | null = null
 let ffmpegStreamProcess: ChildProcess | null = null
 let ffmpegRecordProcess: ChildProcess | null = null
 let streamStartTime: number | null = null
@@ -167,6 +169,10 @@ function stopAllProcesses() {
     presentationWindow.close()
     presentationWindow = null
   }
+  if (pptxControllerWindow && !pptxControllerWindow.isDestroyed()) {
+    pptxControllerWindow.close()
+    pptxControllerWindow = null
+  }
 }
 
 // Get cameras using PowerShell on Windows
@@ -234,21 +240,18 @@ ipcMain.handle('open-pptx', async () => {
 })
 
 async function parsePptxSlides(filePath: string): Promise<any[]> {
-  const AdmZip = await importAdmZip()
-  if (!AdmZip) {
-    // Fallback: use officeparser to get all text, split into chunks
-    return await parseWithOfficeParser(filePath)
-  }
-
   try {
     const zip = new AdmZip(filePath)
+
+    // ── Extract sections from presentation.xml ──────────────────────────────
+    const sections = extractSections(zip)
+
+    // ── Parse each slide ────────────────────────────────────────────────────
     const slideEntries = zip
       .getEntries()
       .filter(
         (e: any) =>
-          e.entryName.startsWith('ppt/slides/slide') &&
-          e.entryName.endsWith('.xml') &&
-          !e.entryName.includes('/_rels/')
+          e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/)
       )
       .sort((a: any, b: any) => {
         const numA = parseInt(a.entryName.match(/\d+/)?.[0] || '0')
@@ -263,10 +266,19 @@ async function parsePptxSlides(filePath: string): Promise<any[]> {
         .map((t: string) => t.replace(/<[^>]+>/g, '').trim())
         .filter((t: string) => t.length > 0)
 
+      // Assign section name to this slide
+      const slideNum = idx + 1
+      let sectionName = 'General'
+      for (const sec of sections) {
+        if (slideNum >= sec.startSlide) sectionName = sec.name
+        else break
+      }
+
       return {
         index: idx,
         text: texts,
-        slideNumber: idx + 1,
+        slideNumber: slideNum,
+        section: sectionName,
       }
     })
 
@@ -276,14 +288,38 @@ async function parsePptxSlides(filePath: string): Promise<any[]> {
   }
 }
 
-async function importAdmZip(): Promise<any> {
+function extractSections(zip: any): Array<{ name: string; startSlide: number }> {
   try {
-    // adm-zip is an optional dependency; use dynamic require to avoid TS errors
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('adm-zip')
-    return mod.default || mod
+    const presEntry = zip.getEntry('ppt/presentation.xml')
+    if (!presEntry) return []
+    const xml = presEntry.getData().toString('utf8')
+
+    // Extract sldIdLst to map rId → slide number
+    const sldIdMatches = [...xml.matchAll(/r:id="(rId\d+)"/g)]
+    const rIdToSlideNum: Record<string, number> = {}
+    sldIdMatches.forEach((m, i) => { rIdToSlideNum[m[1]] = i + 1 })
+
+    // Extract sections from p14:section or p:section elements
+    const sectionMatches = [
+      ...xml.matchAll(/<(?:p14:section|p:section)[^>]+name="([^"]*)"[^>]*>([\s\S]*?)<\/(?:p14:section|p:section)>/g),
+    ]
+
+    if (sectionMatches.length === 0) return []
+
+    const sections: Array<{ name: string; startSlide: number }> = []
+
+    for (const match of sectionMatches) {
+      const name = match[1] || 'Section'
+      const body = match[2]
+      // First sldId rId inside this section
+      const firstRId = body.match(/r:id="(rId\d+)"/)?.[1]
+      const startSlide = firstRId ? (rIdToSlideNum[firstRId] ?? 1) : 1
+      sections.push({ name, startSlide })
+    }
+
+    return sections.sort((a, b) => a.startSlide - b.startSlide)
   } catch {
-    return null
+    return []
   }
 }
 
@@ -701,6 +737,93 @@ ipcMain.handle('presentation-fullscreen', async (_event, enable: boolean) => {
     return { success: true }
   }
   return { success: false }
+})
+
+// ── PPTX Controller Window ────────────────────────────────────────────────────
+
+ipcMain.handle('open-pptx-controller', async () => {
+  if (pptxControllerWindow && !pptxControllerWindow.isDestroyed()) {
+    pptxControllerWindow.focus()
+    return { success: true, alreadyOpen: true }
+  }
+
+  pptxControllerWindow = new BrowserWindow({
+    width: 960,
+    height: 700,
+    minWidth: 700,
+    minHeight: 500,
+    backgroundColor: '#0f0f1a',
+    title: 'PowerPoint Controller',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  if (isDev) {
+    await pptxControllerWindow.loadURL('http://localhost:5173/pptx-controller.html')
+  } else {
+    await pptxControllerWindow.loadFile(path.join(__dirname, '../dist/pptx-controller.html'))
+  }
+
+  pptxControllerWindow.on('closed', () => {
+    pptxControllerWindow = null
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('pptx-controller-closed')
+    }
+  })
+
+  return { success: true }
+})
+
+ipcMain.handle('close-pptx-controller', async () => {
+  if (pptxControllerWindow && !pptxControllerWindow.isDestroyed()) {
+    pptxControllerWindow.close()
+    pptxControllerWindow = null
+  }
+  return { success: true }
+})
+
+// Main → Controller: push slides data after load
+ipcMain.handle('send-slides-to-controller', async (_event, data: any) => {
+  if (pptxControllerWindow && !pptxControllerWindow.isDestroyed()) {
+    pptxControllerWindow.webContents.send('slides-data', data)
+    return { success: true }
+  }
+  return { success: false }
+})
+
+// Main → Controller: sync current slide index
+ipcMain.handle('sync-slide-to-controller', async (_event, index: number) => {
+  if (pptxControllerWindow && !pptxControllerWindow.isDestroyed()) {
+    pptxControllerWindow.webContents.send('slide-index-changed', index)
+  }
+  return { success: true }
+})
+
+// Controller → Main: user selected a slide
+ipcMain.handle('controller-select-slide', async (_event, index: number) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('remote-select-slide', index)
+  }
+  return { success: true }
+})
+
+// Controller → Main: toggle text visibility
+ipcMain.handle('controller-toggle-text', async (_event, visible: boolean) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('remote-toggle-text', visible)
+  }
+  return { success: true }
+})
+
+// Controller → Main: open PPTX (proxy the dialog through main window)
+ipcMain.handle('controller-open-pptx', async () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('remote-open-pptx')
+  }
+  return { success: true }
 })
 
 app.whenReady().then(createWindow)

@@ -10,12 +10,14 @@
     "electron:dev": "wait-on http://localhost:5173 && electron ."
   },
   "dependencies": {
+    "adm-zip": "^0.5.16",
+    "electron-store": "^8.1.0",
     "officeparser": "^4.1.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "electron-store": "^8.1.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.0.0",
@@ -35,7 +37,13 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "public/icon.ico"
+      "icon": "public/icon.ico",
+      "signAndEditExecutable": false,
+      "signingHashAlgorithms": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     },
     "extraResources": [
       {

@@ -8,6 +8,7 @@ export interface Slide {
   index: number
   text: string[]
   slideNumber?: number
+  section?: string
 }
 
 export interface StreamConfig {
