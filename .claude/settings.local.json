@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(set CSC_IDENTITY_AUTO_DISCOVERY=false)",
+      "Bash(npm run:*)",
+      "Bash(dir \"c:\\\\Users\\\\InnovaDeveloper\\\\Desktop\\\\Live\\\\release\" /b)",
+      "Bash(start \"\" \"c:\\\\Users\\\\InnovaDeveloper\\\\Desktop\\\\Live\\\\release\\\\Church Live Stream Studio Setup 1.0.0.exe\")"
     ]
   }
 }
