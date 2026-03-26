@@ -32,16 +32,26 @@ async function loadModules() {
     console.error('Failed to load officeparser:', e)
   }
   try {
+    // In packaged app, modules are in app.asar.unpacked
+    const unpackedBase = app.isPackaged
+      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
+      : path.join(__dirname, '..', 'node_modules')
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    pdfParse = require('pdf-parse')
+    pdfParse = require(path.join(unpackedBase, 'pdf-parse'))
   } catch (e) {
     console.error('Failed to load pdf-parse:', e)
+    // fallback to normal require (dev mode)
+    try { pdfParse = require('pdf-parse') } catch {}
   }
   try {
+    const unpackedBase = app.isPackaged
+      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
+      : path.join(__dirname, '..', 'node_modules')
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    mammoth = require('mammoth')
+    mammoth = require(path.join(unpackedBase, 'mammoth'))
   } catch (e) {
     console.error('Failed to load mammoth:', e)
+    try { mammoth = require('mammoth') } catch {}
   }
 }
 

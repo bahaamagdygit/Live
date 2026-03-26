@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Slide } from '../types'
 
 interface SlidesData {
@@ -100,6 +100,7 @@ export default function PptxControllerApp() {
 
   return (
     <div className="ctrl-root">
+      {/* Header */}
       <header className="ctrl-header">
         <div className="ctrl-header__title">
           <span className="ctrl-header__icon">📊</span>
@@ -108,11 +109,9 @@ export default function PptxControllerApp() {
             {fileName && <div className="ctrl-header__file">{fileName}</div>}
           </div>
         </div>
-        <div className="ctrl-header__actions">
-          <button type="button" className="ctrl-btn ctrl-btn--primary" onClick={handleOpenPptx} disabled={isLoading}>
-            {isLoading ? 'Loading...' : '📂 Open File'}
-          </button>
-        </div>
+        <button type="button" className="ctrl-btn ctrl-btn--primary" onClick={handleOpenPptx} disabled={isLoading}>
+          {isLoading ? 'Loading...' : '📂 Open File'}
+        </button>
       </header>
 
       {slides.length === 0 ? (
@@ -126,31 +125,48 @@ export default function PptxControllerApp() {
         </div>
       ) : (
         <div className="ctrl-body">
-          <div className="ctrl-left">
-            {sections.length > 1 && (
-              <div className="ctrl-sections">
+
+          {/* Col 1: Sections */}
+          <div className="ctrl-sections-col">
+            <div className="ctrl-sections-label">Sections</div>
+            <div className="ctrl-sections-list">
+              {/* All */}
+              <button
+                type="button"
+                className={`ctrl-section-tab ${activeSection === null ? 'ctrl-section-tab--active' : ''}`}
+                onClick={() => setActiveSection(null)}
+              >
+                <span className="ctrl-section-tab__name">All</span>
+                <span className="ctrl-section-tab__count">{slides.length}</span>
+              </button>
+              {/* Per section */}
+              {sections.map(sec => (
                 <button
                   type="button"
-                  className={`ctrl-section-tab ${activeSection === null ? 'ctrl-section-tab--active' : ''}`}
-                  onClick={() => setActiveSection(null)}
+                  key={sec.name}
+                  className={`ctrl-section-tab ${activeSection === sec.name ? 'ctrl-section-tab--active' : ''}`}
+                  onClick={() => setActiveSection(sec.name)}
+                  title={sec.name}
                 >
-                  All ({slides.length})
+                  <span className="ctrl-section-tab__name">{sec.name}</span>
+                  <span className="ctrl-section-tab__count">{sec.slides.length}</span>
                 </button>
-                {sections.map(sec => (
-                  <button
-                    type="button"
-                    key={sec.name}
-                    className={`ctrl-section-tab ${activeSection === sec.name ? 'ctrl-section-tab--active' : ''}`}
-                    onClick={() => setActiveSection(sec.name)}
-                  >
-                    {sec.name}
-                    <span className="ctrl-section-tab__count">{sec.slides.length}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+              ))}
+            </div>
+          </div>
 
-            <div className="ctrl-slides">
+          {/* Col 2: Slides grid */}
+          <div className="ctrl-slides-col">
+            <div className="ctrl-slides-header">
+              <span>
+                {activeSection
+                  ? <><strong>{activeSection}</strong> — {visibleSlides.length} slides</>
+                  : <><strong>All slides</strong> — {slides.length} total</>
+                }
+              </span>
+              <span>{currentIndex + 1} / {slides.length}</span>
+            </div>
+            <div className="ctrl-slides-grid">
               {visibleSlides.map((slide) => {
                 const isActive = slide.index === currentIndex
                 const firstLine = slide.text[0] || '(empty)'
@@ -162,12 +178,17 @@ export default function PptxControllerApp() {
                     className={`ctrl-slide ${isActive ? 'ctrl-slide--active' : ''}`}
                     onClick={() => handleSelectSlide(slide.index)}
                   >
-                    <div className="ctrl-slide__num">{slide.slideNumber ?? slide.index + 1}</div>
+                    <div className="ctrl-slide__header">
+                      <div className="ctrl-slide__num">{slide.slideNumber ?? slide.index + 1}</div>
+                      {slide.section && (
+                        <div className="ctrl-slide__section-badge">{slide.section}</div>
+                      )}
+                    </div>
                     <div className="ctrl-slide__preview">
                       <div className="ctrl-slide__line1">{firstLine}</div>
                       {secondLine && <div className="ctrl-slide__line2">{secondLine}</div>}
                       {slide.text.length > 2 && (
-                        <div className="ctrl-slide__more">+{slide.text.length - 2} lines</div>
+                        <div className="ctrl-slide__more">+{slide.text.length - 2} more</div>
                       )}
                     </div>
                     {isActive && <div className="ctrl-slide__active-bar" />}
@@ -177,6 +198,7 @@ export default function PptxControllerApp() {
             </div>
           </div>
 
+          {/* Col 3: Preview + controls */}
           <div className="ctrl-right">
             <div className="ctrl-preview">
               <div className="ctrl-preview__label">Current Slide</div>
@@ -215,9 +237,7 @@ export default function PptxControllerApp() {
               >
                 ← Prev
               </button>
-              <span className="ctrl-nav-counter">
-                {currentIndex + 1} / {slides.length}
-              </span>
+              <span className="ctrl-nav-counter">{currentIndex + 1} / {slides.length}</span>
               <button
                 type="button"
                 className="ctrl-nav-btn"
@@ -229,10 +249,11 @@ export default function PptxControllerApp() {
             </div>
 
             <div className="ctrl-hints">
-              <span>← → Navigate</span>
-              <span>Space: Show/Hide</span>
+              <span>← → or ↑ ↓ : Navigate slides</span>
+              <span>Space : Show / Hide text</span>
             </div>
           </div>
+
         </div>
       )}
     </div>

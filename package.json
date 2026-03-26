@@ -39,6 +39,12 @@
     "directories": {
       "output": "release"
     },
+    "asarUnpack": [
+      "node_modules/pdf-parse/**",
+      "node_modules/mammoth/**",
+      "node_modules/adm-zip/**",
+      "node_modules/officeparser/**"
+    ],
     "win": {
       "target": "nsis",
       "signAndEditExecutable": false,
