@@ -1,14 +1,15 @@
 {
   "compilerOptions": {
-    "composite": true,
     "skipLibCheck": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "outDir": "dist-electron"
+    "outDir": "dist-electron",
+    "rootDir": "electron"
   },
-  "include": ["vite.config.ts", "electron/**/*.ts"]
+  "include": ["electron/**/*.ts"]
 }

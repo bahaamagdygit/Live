@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import electron from 'vite-plugin-electron'
 import path from 'path'
 
 export default defineConfig({
@@ -15,30 +14,6 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    electron([
-      {
-        entry: 'electron/main.ts',
-        vite: {
-          build: {
-            outDir: 'dist-electron',
-            rollupOptions: {
-              external: ['electron', 'electron-store', 'officeparser', 'adm-zip', 'pdf-parse', 'mammoth', 'child_process', 'fs', 'path', 'os'],
-            },
-          },
-        },
-      },
-      {
-        entry: 'electron/preload.ts',
-        vite: {
-          build: {
-            outDir: 'dist-electron',
-            rollupOptions: {
-              external: ['electron'],
-            },
-          },
-        },
-      },
-    ]),
   ],
   resolve: {
     alias: {

@@ -7,7 +7,12 @@
       "Bash(set CSC_IDENTITY_AUTO_DISCOVERY=false)",
       "Bash(npm run:*)",
       "Bash(dir \"c:\\\\Users\\\\InnovaDeveloper\\\\Desktop\\\\Live\\\\release\" /b)",
-      "Bash(start \"\" \"c:\\\\Users\\\\InnovaDeveloper\\\\Desktop\\\\Live\\\\release\\\\Church Live Stream Studio Setup 1.0.0.exe\")"
+      "Bash(start \"\" \"c:\\\\Users\\\\InnovaDeveloper\\\\Desktop\\\\Live\\\\release\\\\Church Live Stream Studio Setup 1.0.0.exe\")",
+      "Read(//c/Users/InnovaDeveloper/Desktop/**)",
+      "Read(//c/Users/InnovaDeveloper/**)",
+      "Bash(node -e \":*)",
+      "Bash(find src:*)",
+      "Bash(node debug-sections.js \"C:/Users/InnovaDeveloper/Desktop/bahaa.pptx\")"
     ]
   }
 }

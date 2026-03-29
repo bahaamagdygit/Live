@@ -332,10 +332,8 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
                     textAlign: localSettings.overlaySettings.alignment,
                   }}
                 >
-                  بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-                  <br />
-                  In the name of God, the Most Gracious
-                </div>
+                  باسم الآب والابن والروح القدس، الإله الواحد. آمين                  <br />
+                  the Name of the Father, and of the Son, and of the Holy Spirit, One God. Amen                </div>
               </div>
             </div>
           )}

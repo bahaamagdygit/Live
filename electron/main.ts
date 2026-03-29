@@ -59,6 +59,7 @@ let store: any = null
 let mainWindow: BrowserWindow | null = null
 let presentationWindow: BrowserWindow | null = null
 let pptxControllerWindow: BrowserWindow | null = null
+let lastSlidesData: any = null
 let ffmpegStreamProcess: ChildProcess | null = null
 let ffmpegRecordProcess: ChildProcess | null = null
 let streamStartTime: number | null = null
@@ -283,87 +284,80 @@ ipcMain.handle('open-pptx', async () => {
 })
 
 async function parsePptxSlides(filePath: string): Promise<any[]> {
-  try {
-    const zip = new AdmZip(filePath)
+  const zip = new AdmZip(filePath)
 
-    // ── Extract sections from presentation.xml ──────────────────────────────
-    const sections = extractSections(zip)
+  // ── Extract sections ────────────────────────────────────────────────────
+  const sections = extractSections(zip)
+  console.log('[parsePptxSlides] sections:', JSON.stringify(sections))
 
-    // ── Parse each slide ────────────────────────────────────────────────────
-    const slideEntries = zip
-      .getEntries()
-      .filter(
-        (e: any) =>
-          e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/)
-      )
-      .sort((a: any, b: any) => {
-        const numA = parseInt(a.entryName.match(/\d+/)?.[0] || '0')
-        const numB = parseInt(b.entryName.match(/\d+/)?.[0] || '0')
-        return numA - numB
-      })
-
-    const slides = slideEntries.map((entry: any, idx: number) => {
-      const xml = entry.getData().toString('utf8')
-      const textMatches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || []
-      const texts = textMatches
-        .map((t: string) => t.replace(/<[^>]+>/g, '').trim())
-        .filter((t: string) => t.length > 0)
-
-      // Assign section name to this slide
-      const slideNum = idx + 1
-      let sectionName = 'General'
-      for (const sec of sections) {
-        if (slideNum >= sec.startSlide) sectionName = sec.name
-        else break
-      }
-
-      return {
-        index: idx,
-        text: texts,
-        slideNumber: slideNum,
-        section: sectionName,
-      }
+  // ── Parse each slide ────────────────────────────────────────────────────
+  const slideEntries = zip
+    .getEntries()
+    .filter((e: any) => e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/))
+    .sort((a: any, b: any) => {
+      const numA = parseInt(a.entryName.match(/\d+/)?.[0] || '0')
+      const numB = parseInt(b.entryName.match(/\d+/)?.[0] || '0')
+      return numA - numB
     })
 
-    return slides
-  } catch (e) {
-    return await parseWithOfficeParser(filePath)
-  }
+  const slides = slideEntries.map((entry: any, idx: number) => {
+    const xml = entry.getData().toString('utf8')
+    const textMatches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || []
+    const texts = textMatches
+      .map((t: string) => t.replace(/<[^>]+>/g, '').trim())
+      .filter((t: string) => t.length > 0)
+
+    const slideNum = idx + 1
+    let sectionName = sections.length > 0 ? sections[0].name : 'General'
+    for (const sec of sections) {
+      if (sec.startSlide <= slideNum) sectionName = sec.name
+      else break
+    }
+
+    return {
+      index: idx,
+      text: texts,
+      slideNumber: slideNum,
+      section: sectionName,
+    }
+  })
+
+  console.log('[parsePptxSlides] slides sections:', slides.map(s => s.section))
+  return slides
 }
 
 function extractSections(zip: any): Array<{ name: string; startSlide: number }> {
-  try {
-    const presEntry = zip.getEntry('ppt/presentation.xml')
-    if (!presEntry) return []
-    const xml = presEntry.getData().toString('utf8')
+  const presEntry = zip.getEntry('ppt/presentation.xml')
+  if (!presEntry) return []
+  const xml = presEntry.getData().toString('utf8')
 
-    // Extract sldIdLst to map rId → slide number
-    const sldIdMatches = [...xml.matchAll(/r:id="(rId\d+)"/g)]
-    const rIdToSlideNum: Record<string, number> = {}
-    sldIdMatches.forEach((m, i) => { rIdToSlideNum[m[1]] = i + 1 })
+  // Step 1: build numeric id → slide order from <p:sldIdLst>
+  const sldIdLstMatch = xml.match(/<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/)
+  if (!sldIdLstMatch) return []
 
-    // Extract sections from p14:section or p:section elements
-    const sectionMatches = [
-      ...xml.matchAll(/<(?:p14:section|p:section)[^>]+name="([^"]*)"[^>]*>([\s\S]*?)<\/(?:p14:section|p:section)>/g),
-    ]
-
-    if (sectionMatches.length === 0) return []
-
-    const sections: Array<{ name: string; startSlide: number }> = []
-
-    for (const match of sectionMatches) {
-      const name = match[1] || 'Section'
-      const body = match[2]
-      // First sldId rId inside this section
-      const firstRId = body.match(/r:id="(rId\d+)"/)?.[1]
-      const startSlide = firstRId ? (rIdToSlideNum[firstRId] ?? 1) : 1
-      sections.push({ name, startSlide })
-    }
-
-    return sections.sort((a, b) => a.startSlide - b.startSlide)
-  } catch {
-    return []
+  const numIdToSlideNum: Record<string, number> = {}
+  const sldIdRe = /<p:sldId\b[^>]+\bid="(\d+)"/g
+  let m: RegExpExecArray | null
+  let slidePos = 0
+  while ((m = sldIdRe.exec(sldIdLstMatch[1])) !== null) {
+    numIdToSlideNum[m[1]] = ++slidePos
   }
+
+  // Step 2: extract sections using exec loop (avoid matchAll/spread issues)
+  const secRe = /<p14:section\b[^>]+name="([^"]*)"[^>]*>([\s\S]*?)<\/p14:section>/g
+  const sections: Array<{ name: string; startSlide: number }> = []
+
+  while ((m = secRe.exec(xml)) !== null) {
+    const name = m[1] || 'Section'
+    const body = m[2]
+    const idMatch = /<p14:sldId\b[^>]+\bid="(\d+)"/.exec(body)
+    if (!idMatch) continue
+    const startSlide = numIdToSlideNum[idMatch[1]]
+    if (!startSlide) continue
+    sections.push({ name, startSlide })
+  }
+
+  return sections.sort((a, b) => a.startSlide - b.startSlide)
 }
 
 async function parseWithOfficeParser(filePath: string): Promise<any[]> {
@@ -873,10 +867,24 @@ ipcMain.handle('open-pptx-controller', async () => {
   })
 
   if (isDev) {
-    await pptxControllerWindow.loadURL('http://localhost:5173/pptx-controller.html')
+    // Retry until Vite dev server is ready
+    for (let i = 0; i < 10; i++) {
+      try {
+        await pptxControllerWindow.loadURL('http://localhost:5173/pptx-controller.html')
+        break
+      } catch {
+        await new Promise(r => setTimeout(r, 500))
+      }
+    }
   } else {
     await pptxControllerWindow.loadFile(path.join(__dirname, '../dist/pptx-controller.html'))
   }
+
+  pptxControllerWindow.webContents.on('did-finish-load', () => {
+    if (lastSlidesData && pptxControllerWindow && !pptxControllerWindow.isDestroyed()) {
+      pptxControllerWindow.webContents.send('slides-data', lastSlidesData)
+    }
+  })
 
   pptxControllerWindow.on('closed', () => {
     pptxControllerWindow = null
@@ -898,6 +906,9 @@ ipcMain.handle('close-pptx-controller', async () => {
 
 // Main → Controller: push slides data after load
 ipcMain.handle('send-slides-to-controller', async (_event, data: any) => {
+  lastSlidesData = data
+  console.log('[send-slides-to-controller] slides count:', data?.slides?.length)
+  console.log('[send-slides-to-controller] first 3 sections:', data?.slides?.slice(0,3).map((s:any) => s.section))
   if (pptxControllerWindow && !pptxControllerWindow.isDestroyed()) {
     pptxControllerWindow.webContents.send('slides-data', data)
     return { success: true }
