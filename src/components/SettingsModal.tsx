@@ -387,6 +387,7 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
                     }
                   >
                     <option value="top-left">Top Left</option>
+                    <option value="top-center">Top Center</option>
                     <option value="top-right">Top Right</option>
                     <option value="bottom-left">Bottom Left</option>
                     <option value="bottom-right">Bottom Right</option>
@@ -415,6 +416,28 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
                     value={localSettings.logoSettings.opacity}
                     onChange={(e) => updateLogo({ opacity: Number(e.target.value) })}
                   />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Animation</label>
+                  <select
+                    className="form-select"
+                    title="Logo animation"
+                    value={localSettings.logoSettings.animation ?? 'none'}
+                    onChange={(e) =>
+                      updateLogo({ animation: e.target.value as LogoSettings['animation'] })
+                    }
+                  >
+                    <option value="none">None</option>
+                    <option value="rotate-right">Rotate Right</option>
+                    <option value="rotate-left">Rotate Left</option>
+                    <option value="flip-y">Flip Y (reflect left-right)</option>
+                    <option value="flip-x">Flip X (reflect up-down)</option>
+                    <option value="pulse">Pulse</option>
+                    <option value="bounce">Bounce</option>
+                  </select>
                 </div>
               </div>
 

@@ -35,6 +35,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     size: 120,
     opacity: 80,
     visible: false,
+    animation: 'none' as const,
   },
   hotkeys: {
     toggleText: 'Space',
@@ -191,8 +192,14 @@ function App() {
       slideNumber: slides.currentSlideIndex + 1,
       totalSlides: slides.slides.length,
       cameraDeviceId: cameras.activeCamera?.deviceId || '',
+      logoBase64: logoSettings.base64 || '',
+      logoPosition: logoSettings.position,
+      logoSize: logoSettings.size,
+      logoOpacity: logoSettings.opacity,
+      logoVisible: logoSettings.visible,
+      logoAnimation: logoSettings.animation,
     })
-  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera])
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, logoSettings])
 
   // ── PPTX Controller window ──────────────────────────────────────────────────
 
@@ -282,6 +289,12 @@ function App() {
           slideNumber: slides.currentSlideIndex + 1,
           totalSlides: slides.slides.length,
           cameraDeviceId: cameras.activeCamera?.deviceId || '',
+          logoBase64: logoSettings.base64 || '',
+          logoPosition: logoSettings.position,
+          logoSize: logoSettings.size,
+          logoOpacity: logoSettings.opacity,
+          logoVisible: logoSettings.visible,
+          logoAnimation: logoSettings.animation,
         })
       }
     }

@@ -34,10 +34,11 @@ export interface OverlaySettings {
 export interface LogoSettings {
   filePath: string
   base64?: string
-  position: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
+  position: 'top-right' | 'top-left' | 'top-center' | 'bottom-right' | 'bottom-left'
   size: number
   opacity: number
   visible: boolean
+  animation: 'none' | 'rotate-right' | 'rotate-left' | 'flip-y' | 'flip-x' | 'pulse' | 'bounce'
 }
 
 export interface AppSettings {

@@ -13,6 +13,12 @@ interface PresentationData {
   slideNumber?: number
   totalSlides?: number
   cameraDeviceId?: string
+  logoBase64?: string
+  logoPosition?: 'top-right' | 'top-left' | 'top-center' | 'bottom-right' | 'bottom-left'
+  logoSize?: number
+  logoOpacity?: number
+  logoVisible?: boolean
+  logoAnimation?: 'none' | 'rotate-right' | 'rotate-left' | 'flip-y' | 'flip-x' | 'pulse' | 'bounce'
 }
 
 const DEFAULT_DATA: PresentationData = {
@@ -134,6 +140,12 @@ export default function PresentationApp() {
         fontFamily={data.fontFamily}
         textColor={data.textColor}
         alignment={data.alignment}
+        logoBase64={data.logoBase64 || ''}
+        logoPosition={data.logoPosition || 'top-right'}
+        logoSize={data.logoSize ?? 180}
+        logoOpacity={data.logoOpacity ?? 80}
+        logoVisible={data.logoVisible ?? true}
+        logoAnimation={data.logoAnimation || 'none'}
       />
 
       {/* Slide counter (bottom right) */}
@@ -146,9 +158,12 @@ export default function PresentationApp() {
   )
 }
 
-function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, textColor, alignment }: {
+function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, textColor, alignment,
+  logoBase64, logoPosition, logoSize, logoOpacity, logoVisible, logoAnimation }: {
   line1: string; line2: string; visible: boolean;
   fontSize: number; fontFamily: string; textColor: string; alignment: string;
+  logoBase64: string; logoPosition: string; logoSize: number; logoOpacity: number;
+  logoVisible: boolean; logoAnimation: string;
 }) {
   const particlesRef = useRef<HTMLDivElement>(null)
 
@@ -526,27 +541,41 @@ function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, text
         </g>
       </svg>
 
-      {/* ── Logo — top right ── */}
-      <div className="church-logo-wrap">
-        <div className="church-logo-ring-outer" />
-        <div className="church-logo-ring-mid" />
-        <div className="church-logo-ring-inner" />
-        <div className="church-logo-body">
-          <svg viewBox="0 0 60 60" width="58" height="58" xmlns="http://www.w3.org/2000/svg" className="church-logo-svg">
-            <line x1="30" y1="5"  x2="30" y2="55" stroke="#c9a84c" strokeWidth="6" strokeLinecap="round"/>
-            <line x1="8"  y1="20" x2="52" y2="20" stroke="#c9a84c" strokeWidth="6" strokeLinecap="round"/>
-            <line x1="30" y1="5"  x2="30" y2="55" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
-            <line x1="8"  y1="20" x2="52" y2="20" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
-            <circle cx="30" cy="5"  r="5" fill="#f5e27a"/>
-            <circle cx="30" cy="55" r="5" fill="#f5e27a"/>
-            <circle cx="8"  cy="20" r="5" fill="#f5e27a"/>
-            <circle cx="52" cy="20" r="5" fill="#f5e27a"/>
-            <circle cx="30" cy="20" r="8" fill="#fff8dc"/>
-            <circle cx="30" cy="20" r="4" fill="#f5e27a"/>
-          </svg>
-          <span className="church-logo-text">LOGO</span>
+      {/* ── Logo — position controlled ── */}
+      {logoVisible && (
+        <div
+          className={`church-logo-wrap church-logo-pos--${logoPosition}`}
+          style={{ width: logoSize, height: logoSize }}
+        >
+          <div
+            className="church-logo-body"
+            style={{ width: logoSize - 44, height: logoSize - 44, opacity: logoOpacity / 100 }}
+          >
+            {logoBase64 ? (
+              <img
+                src={logoBase64}
+                className={`church-logo-img church-logo-anim--${logoAnimation}`}
+                style={{ width: '85%', height: '85%', objectFit: 'contain', borderRadius: '50%' }}
+                alt="logo"
+              />
+            ) : (
+              <svg viewBox="0 0 60 60" width="58" height="58" xmlns="http://www.w3.org/2000/svg"
+                className={`church-logo-svg church-logo-anim--${logoAnimation}`}>
+                <line x1="30" y1="5"  x2="30" y2="55" stroke="#c9a84c" strokeWidth="6" strokeLinecap="round"/>
+                <line x1="8"  y1="20" x2="52" y2="20" stroke="#c9a84c" strokeWidth="6" strokeLinecap="round"/>
+                <line x1="30" y1="5"  x2="30" y2="55" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+                <line x1="8"  y1="20" x2="52" y2="20" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+                <circle cx="30" cy="5"  r="5" fill="#f5e27a"/>
+                <circle cx="30" cy="55" r="5" fill="#f5e27a"/>
+                <circle cx="8"  cy="20" r="5" fill="#f5e27a"/>
+                <circle cx="52" cy="20" r="5" fill="#f5e27a"/>
+                <circle cx="30" cy="20" r="8" fill="#fff8dc"/>
+                <circle cx="30" cy="20" r="4" fill="#f5e27a"/>
+              </svg>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Reading panel — bottom ── */}
       <div className="church-reading-wrap">
