@@ -12,6 +12,7 @@ interface PresentationData {
   alignment: 'right' | 'center' | 'left'
   slideNumber?: number
   totalSlides?: number
+  cameraDeviceId?: string
 }
 
 const DEFAULT_DATA: PresentationData = {
@@ -32,6 +33,43 @@ export default function PresentationApp() {
   const animRef = useRef<number | null>(null)
   const opacityRef = useRef(0)
   const targetRef = useRef(0)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  // Start/switch camera stream when deviceId changes
+  useEffect(() => {
+    const deviceId = data.cameraDeviceId
+    if (!deviceId) return
+
+    const startStream = async () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+      try {
+        const constraints: MediaStreamConstraints = {
+          video: deviceId.length > 5 ? { deviceId: { ideal: deviceId } } : true,
+          audio: false,
+        }
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+        }
+      } catch (err) {
+        console.warn('Presentation camera error:', err)
+      }
+    }
+
+    startStream()
+
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+    }
+  }, [data.cameraDeviceId])
 
   // Listen for updates from main process
   useEffect(() => {
@@ -83,6 +121,9 @@ export default function PresentationApp() {
     <div className="presentation-root">
       {/* Black background always */}
       <div className="presentation-bg" />
+
+      {/* Camera feed */}
+      <video ref={videoRef} className="presentation-camera" autoPlay playsInline muted />
 
       {/* Church gold border overlay — text shown inside reading panel */}
       <ChurchBorderOverlay

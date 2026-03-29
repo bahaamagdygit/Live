@@ -190,8 +190,9 @@ function App() {
       ...overlaySettings,
       slideNumber: slides.currentSlideIndex + 1,
       totalSlides: slides.slides.length,
+      cameraDeviceId: cameras.activeCamera?.deviceId || '',
     })
-  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length])
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera])
 
   // ── PPTX Controller window ──────────────────────────────────────────────────
 
@@ -280,6 +281,7 @@ function App() {
           ...overlaySettings,
           slideNumber: slides.currentSlideIndex + 1,
           totalSlides: slides.slides.length,
+          cameraDeviceId: cameras.activeCamera?.deviceId || '',
         })
       }
     }
