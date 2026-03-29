@@ -214,6 +214,11 @@
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
+.panel__header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
 
 .panel__title {
   display: flex;
@@ -427,11 +432,111 @@
 
 /* ====== PPTX LAUNCHER (right sidebar) ====== */
 
-.pptx-launcher {
+.app-main__right {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
   height: 100%;
+}
+
+.pptx-launcher {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
 }
+
+/* ── Camera Settings (inside CameraPanel) ── */
+.cam-settings {
+  margin-top: 10px;
+  border-top: 1px solid var(--border, #2a2a4a);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cam-settings__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent, #e94560);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cam-settings__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cam-settings__slider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cam-settings__label {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+.cam-settings__select {
+  flex: 1;
+  background: var(--bg-3, #0f3460);
+  color: var(--text, #e0e0e0);
+  border: 1px solid var(--border, #2a2a4a);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cam-settings__slider-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent, #e94560);
+  cursor: pointer;
+}
+.cam-settings__rst {
+  background: none;
+  border: 1px solid var(--border, #2a2a4a);
+  border-radius: 4px;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  padding: 1px 5px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.cam-settings__rst:hover { color: var(--accent, #e94560); border-color: var(--accent, #e94560); }
+.cam-settings__flip-btns {
+  display: flex;
+  gap: 6px;
+}
+.cam-settings__flip {
+  background: var(--bg-3, #0f3460);
+  border: 1px solid var(--border, #2a2a4a);
+  border-radius: 4px;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+.cam-settings__flip--on {
+  background: var(--accent, #e94560);
+  border-color: var(--accent, #e94560);
+  color: #fff;
+}
+.cam-settings__reset-all {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--border, #2a2a4a);
+  border-radius: 4px;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  padding: 5px;
+  font-size: 12px;
+  margin-top: 2px;
+}
+.cam-settings__reset-all:hover { color: var(--accent, #e94560); border-color: var(--accent, #e94560); }
+.btn--active { color: var(--accent, #e94560) !important; }
 
 .pptx-launcher__body {
   flex: 1;

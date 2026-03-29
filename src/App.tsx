@@ -192,6 +192,15 @@ function App() {
       slideNumber: slides.currentSlideIndex + 1,
       totalSlides: slides.slides.length,
       cameraDeviceId: cameras.activeCamera?.deviceId || '',
+      cameraScale: cameras.camView.scale,
+      cameraX: cameras.camView.offsetX,
+      cameraY: cameras.camView.offsetY,
+      cameraFit: cameras.camView.fit,
+      cameraBrightness: cameras.camView.brightness,
+      cameraContrast: cameras.camView.contrast,
+      cameraSaturation: cameras.camView.saturation,
+      cameraFlipH: cameras.camView.flipH,
+      cameraFlipV: cameras.camView.flipV,
       logoBase64: logoSettings.base64 || '',
       logoPosition: logoSettings.position,
       logoSize: logoSettings.size,
@@ -199,7 +208,7 @@ function App() {
       logoVisible: logoSettings.visible,
       logoAnimation: logoSettings.animation,
     })
-  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, logoSettings])
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings])
 
   // ── PPTX Controller window ──────────────────────────────────────────────────
 
@@ -289,6 +298,15 @@ function App() {
           slideNumber: slides.currentSlideIndex + 1,
           totalSlides: slides.slides.length,
           cameraDeviceId: cameras.activeCamera?.deviceId || '',
+          cameraScale: cameras.camView.scale,
+          cameraX: cameras.camView.offsetX,
+          cameraY: cameras.camView.offsetY,
+          cameraFit: cameras.camView.fit,
+          cameraBrightness: cameras.camView.brightness,
+          cameraContrast: cameras.camView.contrast,
+          cameraSaturation: cameras.camView.saturation,
+          cameraFlipH: cameras.camView.flipH,
+          cameraFlipV: cameras.camView.flipV,
           logoBase64: logoSettings.base64 || '',
           logoPosition: logoSettings.position,
           logoSize: logoSettings.size,
@@ -427,6 +445,8 @@ function App() {
             onRefresh={cameras.refreshCameras}
             isLoading={cameras.isLoading}
             error={cameras.cameraError}
+            camView={cameras.camView}
+            onCamViewChange={patch => cameras.setCamView(patch)}
           />
         </div>
 
@@ -440,7 +460,7 @@ function App() {
           />
         </div>
 
-        {/* Right: PowerPoint controller launcher */}
+        {/* Right: Camera controls + PowerPoint controller launcher */}
         <div className="app-main__right">
           <div className="panel pptx-launcher">
             <div className="panel__header">
@@ -498,6 +518,7 @@ function App() {
               </button>
             </div>
           </div>
+
         </div>
       </main>
 

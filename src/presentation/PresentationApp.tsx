@@ -13,6 +13,15 @@ interface PresentationData {
   slideNumber?: number
   totalSlides?: number
   cameraDeviceId?: string
+  cameraScale?: number
+  cameraX?: number
+  cameraY?: number
+  cameraFit?: 'cover' | 'contain' | 'fill' | 'none'
+  cameraBrightness?: number
+  cameraContrast?: number
+  cameraSaturation?: number
+  cameraFlipH?: boolean
+  cameraFlipV?: boolean
   logoBase64?: string
   logoPosition?: 'top-right' | 'top-left' | 'top-center' | 'bottom-right' | 'bottom-left'
   logoSize?: number
@@ -53,17 +62,26 @@ export default function PresentationApp() {
         streamRef.current = null
       }
       try {
-        const constraints: MediaStreamConstraints = {
-          video: deviceId.length > 5 ? { deviceId: { ideal: deviceId } } : true,
-          audio: false,
-        }
-        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        const videoConstraints: MediaTrackConstraints = deviceId.length > 5
+          ? { deviceId: { exact: deviceId }, width: { ideal: 3840 }, height: { ideal: 2160 } }
+          : { width: { ideal: 3840 }, height: { ideal: 2160 } }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false })
         streamRef.current = stream
         if (videoRef.current) {
           videoRef.current.srcObject = stream
         }
       } catch (err) {
-        console.warn('Presentation camera error:', err)
+        // fallback to lower resolution
+        try {
+          const fallback: MediaTrackConstraints = deviceId.length > 5
+            ? { deviceId: { ideal: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+            : { width: { ideal: 1920 }, height: { ideal: 1080 } }
+          const stream = await navigator.mediaDevices.getUserMedia({ video: fallback, audio: false })
+          streamRef.current = stream
+          if (videoRef.current) videoRef.current.srcObject = stream
+        } catch (err2) {
+          console.warn('Presentation camera error:', err2)
+        }
       }
     }
 
@@ -129,7 +147,19 @@ export default function PresentationApp() {
       <div className="presentation-bg" />
 
       {/* Camera feed */}
-      <video ref={videoRef} className="presentation-camera" autoPlay playsInline muted />
+      <video
+        ref={videoRef}
+        className="presentation-camera"
+        autoPlay
+        playsInline
+        muted
+        style={{
+          objectFit: data.cameraFit ?? 'cover',
+          transform: `scale(${(data.cameraScale ?? 100) / 100}) translate(${data.cameraX ?? 0}%, ${data.cameraY ?? 0}%) scaleX(${data.cameraFlipH ? -1 : 1}) scaleY(${data.cameraFlipV ? -1 : 1})`,
+          transformOrigin: 'center center',
+          filter: `brightness(${data.cameraBrightness ?? 100}%) contrast(${data.cameraContrast ?? 100}%) saturate(${data.cameraSaturation ?? 100}%)`,
+        }}
+      />
 
       {/* Church gold border overlay — text shown inside reading panel */}
       <ChurchBorderOverlay
