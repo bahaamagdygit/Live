@@ -49,6 +49,193 @@ html, body, #presentation-root {
   letter-spacing: 0.02em;
 }
 
+/* ── Church border overlay ── */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Amiri:wght@400;700&display=swap');
+
+.church-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.church-vignette {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.35) 100%),
+    linear-gradient(to bottom, rgba(0,0,0,0.30) 0%, transparent 14%, transparent 80%, rgba(0,0,0,0.55) 100%),
+    linear-gradient(to right,  rgba(0,0,0,0.28) 0%, transparent 8%, transparent 92%, rgba(0,0,0,0.28) 100%);
+}
+
+.church-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.church-sweep {
+  position: absolute;
+  height: 14px; width: 200px;
+  top: 26px;
+  background: linear-gradient(90deg, transparent, rgba(255,248,200,0.55), transparent);
+  filter: blur(4px);
+  animation: churchSweepL 9s linear infinite;
+}
+@keyframes churchSweepL { 0%{left:-200px} 100%{left:100%} }
+
+.church-sweep-rev {
+  top: auto; bottom: 26px;
+  animation: churchSweepR 9s linear infinite 4s;
+}
+@keyframes churchSweepR { 0%{left:100%} 100%{left:-200px} }
+
+.church-particles {
+  position: absolute; inset: 0; overflow: hidden;
+}
+.church-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: #f5e27a;
+  animation: churchFloatUp linear infinite;
+  opacity: 0;
+}
+@keyframes churchFloatUp {
+  0%   { opacity:0; transform: translateY(0) scale(0.5); }
+  10%  { opacity:0.6; }
+  80%  { opacity:0.3; }
+  100% { opacity:0; transform: translateY(-180px) scale(1); }
+}
+
+/* ── Church Logo ── */
+.church-logo-wrap {
+  position: absolute;
+  top: 36px; right: 36px;
+  width: 180px; height: 180px;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 20;
+}
+.church-logo-ring-outer {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 2px solid #a67c30;
+  animation: churchGlowPulse 3.5s ease-in-out infinite;
+}
+.church-logo-ring-mid {
+  position: absolute; inset: 8px; border-radius: 50%;
+  border: 4px solid #c9a84c;
+  box-shadow: 0 0 0 1px #f5e27a55;
+}
+.church-logo-ring-inner {
+  position: absolute; inset: 18px; border-radius: 50%;
+  border: 1.5px solid #a67c3088;
+}
+.church-logo-body {
+  width: 136px; height: 136px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, rgba(20,10,0,0.7), rgba(5,2,0,0.88));
+  border: 2px solid #c9a84c;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; position: relative; overflow: hidden;
+}
+.church-logo-body::before {
+  content: '';
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 70%, rgba(245,226,122,0.08) 80%, transparent 90%);
+  animation: churchRotateSlow 8s linear infinite;
+}
+.church-logo-svg { position: relative; z-index: 1; }
+.church-logo-text {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 12px; letter-spacing: 3px;
+  color: #c9a84c; text-transform: uppercase;
+  position: relative; z-index: 1;
+}
+@keyframes churchRotateSlow { to { transform: rotate(360deg); } }
+@keyframes churchGlowPulse {
+  0%,100% { box-shadow: 0 0 10px 2px #c9a84c44; }
+  50%      { box-shadow: 0 0 22px 6px #f5e27a88; }
+}
+
+/* ── Reading panel ── */
+.church-reading-wrap {
+  position: absolute;
+  bottom: 48px; left: 55px; right: 55px;
+  z-index: 20;
+}
+.church-reading-topbar {
+  height: 4px;
+  background: linear-gradient(90deg,
+    transparent 0%, #6b4a10 3%, #c9a84c 10%, #fff8dc 30%,
+    #f5e27a 50%, #fff8dc 70%, #c9a84c 90%, #6b4a10 97%, transparent 100%);
+  margin-bottom: 1px;
+  animation: churchBarShimmer 5s ease-in-out infinite;
+}
+.church-reading-midbar {
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent 0%, #a67c30 8%, #f5e27a 50%, #a67c30 92%, transparent 100%);
+  margin-bottom: 2px; opacity: 0.6;
+}
+@keyframes churchBarShimmer {
+  0%,100% { opacity:0.88; filter: brightness(1); }
+  50%      { opacity:1;    filter: brightness(1.15); }
+}
+.church-reading-panel {
+  position: relative;
+  background: linear-gradient(180deg,
+    rgba(8,4,0,0.0) 0%, rgba(8,4,0,0.78) 12%,
+    rgba(6,3,0,0.93) 55%, rgba(4,2,0,0.97) 100%);
+  padding: 24px 110px 28px 110px;
+  border-left: 2px solid #a67c3055;
+  border-right: 2px solid #a67c3055;
+  border-bottom: 2px solid #a67c3088;
+}
+.church-panel-side {
+  position: absolute; top: 0; bottom: 0;
+  width: 90px;
+  display: flex; align-items: center; justify-content: center;
+}
+.church-panel-side--left  { left: 0; }
+.church-panel-side--right { right: 0; }
+.church-panel-side--right svg { transform: scaleX(-1); }
+.church-reading-arabic,
+.church-reading-line1 {
+  font-family: 'Amiri', 'Traditional Arabic', 'Georgia', serif;
+  font-size: 34px; font-weight: 700;
+  color: #fff8e7;
+  text-align: center;
+  line-height: 1.55;
+  text-shadow: 0 0 18px rgba(197,160,60,0.6), 0 2px 4px rgba(0,0,0,0.8);
+  letter-spacing: 0.8px;
+  width: 100%;
+}
+.church-reading-divider {
+  display: flex; align-items: center; gap: 14px;
+  margin: 8px auto; width: 70%;
+}
+.church-reading-divider-line {
+  flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, #c9a84c88, transparent);
+}
+.church-reading-divider-diamond {
+  width: 6px; height: 6px;
+  background: #f5e27a;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+.church-reading-english,
+.church-reading-line2 {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 17px; font-weight: 400;
+  color: #d4a843;
+  text-align: center;
+  line-height: 1.5; letter-spacing: 1.5px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+  width: 100%;
+}
+
 .presentation-counter {
   position: absolute;
   bottom: 16px;

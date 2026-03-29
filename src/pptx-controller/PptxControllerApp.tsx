@@ -34,7 +34,7 @@ export default function PptxControllerApp() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [textVisible, setTextVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [activeSection, setActiveSection] = useState<string>('')
+  const [activeSectionName, setActiveSectionName] = useState<string>('')
   const activeSlideRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function PptxControllerApp() {
       setCurrentIndex(data.currentIndex)
       setTextVisible(data.textVisible)
       const active = data.slides[data.currentIndex]
-      setActiveSection(active?.section || 'General')
+      setActiveSectionName(active?.section || 'General')
     })
     return cleanup
   }, [])
@@ -54,13 +54,9 @@ export default function PptxControllerApp() {
     if (!window.electronAPI?.onSlideIndexChanged) return
     const cleanup = window.electronAPI.onSlideIndexChanged((index: number) => {
       setCurrentIndex(index)
-      setActiveSection(prev => {
-        const slide = slides[index]
-        return slide?.section || prev
-      })
     })
     return cleanup
-  }, [slides])
+  }, [])
 
   useEffect(() => {
     activeSlideRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -69,16 +65,9 @@ export default function PptxControllerApp() {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        handleSelectSlide(Math.min(currentIndex + 1, slides.length - 1))
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        handleSelectSlide(Math.max(currentIndex - 1, 0))
-      } else if (e.key === ' ') {
-        e.preventDefault()
-        handleToggleText(!textVisible)
-      }
+      if (e.key === 'ArrowDown') { e.preventDefault(); handleSelectSlide(Math.min(currentIndex + 1, slides.length - 1)) }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); handleSelectSlide(Math.max(currentIndex - 1, 0)) }
+      else if (e.key === ' ') { e.preventDefault(); handleToggleText(!textVisible) }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
@@ -103,44 +92,79 @@ export default function PptxControllerApp() {
   const sections = groupBySection(slides)
   const currentSlide = slides[currentIndex]
   const currentText = currentSlide?.text.join('\n') || ''
-
-  // slides of the selected section
-  const visibleSection = sections.find(s => s.name === activeSection) || sections[0]
-  const visibleSlides = visibleSection?.slides || []
+  const activeSection = sections.find(s => s.name === activeSectionName) ?? sections[0]
 
   return (
     <div className="ctrl-root">
-      {/* Header */}
+
+      {/* ── Header ── */}
       <header className="ctrl-header">
-        <button type="button" className="ctrl-open-btn" onClick={handleOpenPptx} disabled={isLoading}>
-          {isLoading ? '...' : '📂'} Open File
-        </button>
-        <div className="ctrl-header__info">
-          {fileName && <span className="ctrl-header__file">{fileName}</span>}
-          <span className="ctrl-header__pos">{currentIndex + 1} / {slides.length}</span>
+        <div className="ctrl-header__left">
+          <span className="ctrl-header__icon">📊</span>
+          <div>
+            <div className="ctrl-header__title">PowerPoint Controller</div>
+            {fileName && <div className="ctrl-header__file">{fileName}</div>}
+          </div>
         </div>
+        <button type="button" className="ctrl-open-btn" onClick={handleOpenPptx} disabled={isLoading}>
+          {isLoading ? 'Loading...' : '📂 Open File'}
+        </button>
       </header>
 
       {slides.length === 0 ? (
         <div className="ctrl-empty">
           <div className="ctrl-empty__icon">📊</div>
           <p className="ctrl-empty__title">No File Loaded</p>
-          <p className="ctrl-empty__hint">Open a PPTX file to get started</p>
-          <button type="button" className="ctrl-open-btn ctrl-open-btn--lg" onClick={handleOpenPptx}>
-            📂 Open File
-          </button>
+          <p className="ctrl-empty__sub">Open a PPTX file to get started</p>
+          <button type="button" className="ctrl-open-btn ctrl-open-btn--lg" onClick={handleOpenPptx}>📂 Open File</button>
         </div>
       ) : (
         <div className="ctrl-body">
 
-          {/* LEFT: Slide cards of active section */}
-          <div className="ctrl-slides-panel">
-            <div className="ctrl-slides-panel__header">
-              <span className="ctrl-slides-panel__sec-name">{visibleSection?.name}</span>
-              <span className="ctrl-slides-panel__count">{visibleSlides.length} slides</span>
+          {/* ── COL A: Preview + controls (leftmost) ── */}
+          <div className="ctrl-col-preview">
+            <div className="col-label">CURRENT SLIDE</div>
+            <div className="ctrl-preview-box">
+              <div className="ctrl-preview-text" dir={isRtl(currentText) ? 'rtl' : 'ltr'}>
+                {currentSlide?.text.length
+                  ? currentSlide.text.map((l, i) => <div key={i} className="ctrl-preview-line">{l}</div>)
+                  : <span className="ctrl-preview-empty">No text</span>}
+              </div>
             </div>
-            <div className="ctrl-cards">
-              {visibleSlides.map(slide => {
+            <div className="ctrl-preview-meta">
+              Slide {currentIndex + 1} of {slides.length}
+              {currentSlide?.section && <span className="ctrl-preview-sec"> · {currentSlide.section}</span>}
+            </div>
+
+            <button
+              type="button"
+              className={`ctrl-show-btn${textVisible ? ' ctrl-show-btn--on' : ''}`}
+              onClick={() => handleToggleText(!textVisible)}
+            >
+              <span className="ctrl-show-dot" />
+              {textVisible ? 'HIDE TEXT' : 'SHOW TEXT'}
+            </button>
+
+            <div className="ctrl-nav">
+              <button type="button" className="ctrl-nav-btn" onClick={() => handleSelectSlide(Math.max(currentIndex - 1, 0))} disabled={currentIndex === 0}>← Prev</button>
+              <span className="ctrl-nav-num">{currentIndex + 1}/{slides.length}</span>
+              <button type="button" className="ctrl-nav-btn" onClick={() => handleSelectSlide(Math.min(currentIndex + 1, slides.length - 1))} disabled={currentIndex === slides.length - 1}>Next →</button>
+            </div>
+
+            <div className="ctrl-hints">
+              <span>↑↓ Navigate</span>
+              <span>Space Show/Hide</span>
+            </div>
+          </div>
+
+          {/* ── COL B: Slide cards (middle) ── */}
+          <div className="ctrl-col-cards">
+            <div className="ctrl-cards-header">
+              <span className="ctrl-cards-secname">{activeSection?.name}</span>
+              <span className="ctrl-cards-count">{activeSection?.slides.length} slides</span>
+            </div>
+            <div className="ctrl-cards-grid">
+              {(activeSection?.slides ?? []).map(slide => {
                 const isActive = slide.index === currentIndex
                 const line1 = slide.text[0] || ''
                 const line2 = slide.text[1] || ''
@@ -152,78 +176,41 @@ export default function PptxControllerApp() {
                     onClick={() => handleSelectSlide(slide.index)}
                   >
                     <div className="ctrl-card__num">{slide.slideNumber ?? slide.index + 1}</div>
-                    <div className="ctrl-card__content">
-                      <div className="ctrl-card__line1">{line1 || <span className="ctrl-card__empty">—</span>}</div>
+                    <div className="ctrl-card__body">
+                      {line1
+                        ? <div className="ctrl-card__line1">{line1}</div>
+                        : <div className="ctrl-card__empty">—</div>}
                       {line2 && <div className="ctrl-card__line2">{line2}</div>}
                     </div>
-                    {isActive && <div className="ctrl-card__bar" />}
+                    {isActive && <div className="ctrl-card__indicator" />}
                   </div>
                 )
               })}
             </div>
           </div>
 
-          {/* RIGHT: Sections list + preview + controls */}
-          <div className="ctrl-right">
-
-            {/* Sections */}
+          {/* ── COL C: Sections list (rightmost) ── */}
+          <div className="ctrl-col-sections">
+            <div className="col-label">SECTIONS</div>
             <div className="ctrl-sec-list">
-              <div className="ctrl-sec-list__label">Sections</div>
               {sections.map(sec => {
-                const isActive = sec.name === activeSection
-                const hasCurrentSlide = sec.slides.some(s => s.index === currentIndex)
+                const isActive = sec.name === activeSectionName
+                const hasCurrent = sec.slides.some(s => s.index === currentIndex)
                 return (
                   <button
                     key={sec.name}
-                    type="button"
-                    className={`ctrl-sec-btn${isActive ? ' ctrl-sec-btn--active' : ''}${hasCurrentSlide && !isActive ? ' ctrl-sec-btn--has-current' : ''}`}
-                    onClick={() => setActiveSection(sec.name)}
+                    className={`ctrl-sec-item${isActive ? ' ctrl-sec-item--active' : ''}${hasCurrent && !isActive ? ' ctrl-sec-item--current' : ''}`}
+                    onClick={() => setActiveSectionName(sec.name)}
                     title={sec.name}
                   >
-                    <span className="ctrl-sec-btn__name">{sec.name}</span>
-                    <span className="ctrl-sec-btn__count">{sec.slides.length}</span>
+                    <span className="ctrl-sec-item__count">{sec.slides.length}</span>
+                    <span className="ctrl-sec-item__name">{sec.name}</span>
                   </button>
                 )
               })}
             </div>
-
-            {/* Preview */}
-            <div className="ctrl-preview">
-              <div className="ctrl-preview__label">Current Slide</div>
-              <div className="ctrl-preview__screen">
-                <div className="ctrl-preview__text" dir={isRtl(currentText) ? 'rtl' : 'ltr'}>
-                  {currentSlide?.text.map((line, i) => (
-                    <div key={i} className="ctrl-preview__line">{line}</div>
-                  )) || <span className="ctrl-preview__empty">No text</span>}
-                </div>
-              </div>
-              <div className="ctrl-preview__meta">
-                Slide {currentIndex + 1} · {currentSlide?.section}
-              </div>
-            </div>
-
-            {/* Show/Hide */}
-            <button
-              type="button"
-              className={`ctrl-show-btn${textVisible ? ' ctrl-show-btn--active' : ''}`}
-              onClick={() => handleToggleText(!textVisible)}
-            >
-              <span className="ctrl-show-btn__dot" />
-              {textVisible ? 'HIDE TEXT' : 'SHOW TEXT'}
-            </button>
-
-            {/* Nav */}
-            <div className="ctrl-nav">
-              <button type="button" className="ctrl-nav-btn"
-                onClick={() => handleSelectSlide(Math.max(currentIndex - 1, 0))}
-                disabled={currentIndex === 0}>← Prev</button>
-              <span className="ctrl-nav-counter">{currentIndex + 1} / {slides.length}</span>
-              <button type="button" className="ctrl-nav-btn"
-                onClick={() => handleSelectSlide(Math.min(currentIndex + 1, slides.length - 1))}
-                disabled={currentIndex === slides.length - 1}>Next →</button>
-            </div>
-
           </div>
+
         </div>
       )}
     </div>

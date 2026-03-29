@@ -56,6 +56,7 @@ async function loadModules() {
 }
 
 let store: any = null
+let ipcHandlersRegistered = false
 let mainWindow: BrowserWindow | null = null
 let presentationWindow: BrowserWindow | null = null
 let pptxControllerWindow: BrowserWindow | null = null
@@ -65,7 +66,7 @@ let ffmpegRecordProcess: ChildProcess | null = null
 let streamStartTime: number | null = null
 let streamTimer: NodeJS.Timeout | null = null
 
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
+const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1' || !app.isPackaged
 
 function getAppPath() {
   return isDev ? path.join(__dirname, '..') : path.join(process.resourcesPath)
@@ -73,6 +74,10 @@ function getAppPath() {
 
 async function createWindow() {
   await loadModules()
+  if (!ipcHandlersRegistered) {
+    registerIpcHandlers()
+    ipcHandlersRegistered = true
+  }
 
   if (Store) {
     store = new Store({
@@ -199,6 +204,8 @@ function stopAllProcesses() {
     pptxControllerWindow = null
   }
 }
+
+function registerIpcHandlers() {
 
 // Get cameras using PowerShell on Windows
 ipcMain.handle('get-cameras', async () => {
@@ -947,6 +954,8 @@ ipcMain.handle('controller-open-pptx', async () => {
   }
   return { success: true }
 })
+
+} // end registerIpcHandlers
 
 app.whenReady().then(createWindow)
 

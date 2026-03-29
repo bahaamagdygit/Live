@@ -84,36 +84,16 @@ export default function PresentationApp() {
       {/* Black background always */}
       <div className="presentation-bg" />
 
-      {/* Text overlay */}
-      <div
-        className="presentation-overlay"
-        style={{ ...positionStyle, opacity }}
-        dir={isRtl(data.text) ? 'rtl' : 'ltr'}
-      >
-        <div
-          className="presentation-text-box"
-          style={{
-            backgroundColor: bgStyle,
-            textAlign: data.alignment,
-            padding: '0.6em 1.2em',
-          }}
-        >
-          {lines.map((line, i) => (
-            <div
-              key={i}
-              className="presentation-line"
-              style={{
-                fontSize: `${data.fontSize}px`,
-                fontFamily: data.fontFamily,
-                color: data.textColor,
-                lineHeight: 1.4,
-              }}
-            >
-              {line}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Church gold border overlay — text shown inside reading panel */}
+      <ChurchBorderOverlay
+        line1={lines[0] || ''}
+        line2={lines[1] || ''}
+        visible={data.visible}
+        fontSize={data.fontSize}
+        fontFamily={data.fontFamily}
+        textColor={data.textColor}
+        alignment={data.alignment}
+      />
 
       {/* Slide counter (bottom right) */}
       {data.slideNumber !== undefined && data.totalSlides !== undefined && (
@@ -121,6 +101,485 @@ export default function PresentationApp() {
           {data.slideNumber} / {data.totalSlides}
         </div>
       )}
+    </div>
+  )
+}
+
+function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, textColor, alignment }: {
+  line1: string; line2: string; visible: boolean;
+  fontSize: number; fontFamily: string; textColor: string; alignment: string;
+}) {
+  const particlesRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const container = particlesRef.current
+    if (!container) return
+    const positions = [
+      ...Array.from({ length: 14 }, (_, i) => ({ x: 140 + i * 120, y: 20 })),
+      ...Array.from({ length: 14 }, (_, i) => ({ x: 140 + i * 120, y: 1060 })),
+      ...Array.from({ length: 7 },  (_, i) => ({ x: 22,   y: 160 + i * 110 })),
+      ...Array.from({ length: 7 },  (_, i) => ({ x: 1898, y: 160 + i * 110 })),
+    ]
+    positions.forEach(p => {
+      const el = document.createElement('div')
+      el.className = 'church-particle'
+      const size = 2 + Math.random() * 3
+      const delay = Math.random() * 8
+      const dur   = 5 + Math.random() * 6
+      const drift = (Math.random() - 0.5) * 30
+      el.style.cssText = `left:${p.x + drift}px;top:${p.y}px;width:${size}px;height:${size}px;animation-duration:${dur}s;animation-delay:${delay}s;box-shadow:0 0 ${size * 2}px #f5e27a88;`
+      container.appendChild(el)
+    })
+  }, [])
+
+  return (
+    <div className="church-overlay">
+      <div className="church-vignette" />
+      <div className="church-sweep" />
+      <div className="church-sweep church-sweep-rev" />
+      <div className="church-particles" ref={particlesRef} />
+      <svg className="church-svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="cGH" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stopColor="#2a1800" stopOpacity="0"/>
+            <stop offset="4%"   stopColor="#6b4a10"/>
+            <stop offset="15%"  stopColor="#c9a84c"/>
+            <stop offset="30%"  stopColor="#f5e27a"/>
+            <stop offset="50%"  stopColor="#fff8dc"/>
+            <stop offset="70%"  stopColor="#f5e27a"/>
+            <stop offset="85%"  stopColor="#c9a84c"/>
+            <stop offset="96%"  stopColor="#6b4a10"/>
+            <stop offset="100%" stopColor="#2a1800" stopOpacity="0"/>
+          </linearGradient>
+          <linearGradient id="cGV" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor="#2a1800" stopOpacity="0"/>
+            <stop offset="4%"   stopColor="#6b4a10"/>
+            <stop offset="15%"  stopColor="#c9a84c"/>
+            <stop offset="30%"  stopColor="#f5e27a"/>
+            <stop offset="50%"  stopColor="#fff8dc"/>
+            <stop offset="70%"  stopColor="#f5e27a"/>
+            <stop offset="85%"  stopColor="#c9a84c"/>
+            <stop offset="96%"  stopColor="#6b4a10"/>
+            <stop offset="100%" stopColor="#2a1800" stopOpacity="0"/>
+          </linearGradient>
+          <filter id="cGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2.5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="cGlowS" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="4" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <radialGradient id="cRC" cx="0%" cy="0%" r="100%">
+            <stop offset="0%"   stopColor="#f5e27a" stopOpacity="0.22"/>
+            <stop offset="100%" stopColor="#2a1800" stopOpacity="0"/>
+          </radialGradient>
+        </defs>
+
+        {/* ── Thick border ── */}
+        <rect x="0"    y="6"    width="1920" height="5"  fill="url(#cGH)" opacity="0.30"/>
+        <rect x="0"    y="12"   width="1920" height="18" fill="url(#cGH)" opacity="1.00"/>
+        <rect x="0"    y="32"   width="1920" height="8"  fill="url(#cGH)" opacity="0.55"/>
+        <rect x="0"    y="42"   width="1920" height="3"  fill="url(#cGH)" opacity="0.30"/>
+        <rect x="0"    y="47"   width="1920" height="1"  fill="url(#cGH)" opacity="0.18"/>
+        <rect x="0"    y="1067" width="1920" height="5"  fill="url(#cGH)" opacity="0.30"/>
+        <rect x="0"    y="1050" width="1920" height="18" fill="url(#cGH)" opacity="1.00"/>
+        <rect x="0"    y="1040" width="1920" height="8"  fill="url(#cGH)" opacity="0.55"/>
+        <rect x="0"    y="1032" width="1920" height="3"  fill="url(#cGH)" opacity="0.30"/>
+        <rect x="0"    y="1029" width="1920" height="1"  fill="url(#cGH)" opacity="0.18"/>
+        <rect x="6"    y="0"    width="5"  height="1080" fill="url(#cGV)" opacity="0.30"/>
+        <rect x="12"   y="0"    width="18" height="1080" fill="url(#cGV)" opacity="1.00"/>
+        <rect x="32"   y="0"    width="8"  height="1080" fill="url(#cGV)" opacity="0.55"/>
+        <rect x="42"   y="0"    width="3"  height="1080" fill="url(#cGV)" opacity="0.30"/>
+        <rect x="47"   y="0"    width="1"  height="1080" fill="url(#cGV)" opacity="0.18"/>
+        <rect x="1909" y="0"    width="5"  height="1080" fill="url(#cGV)" opacity="0.30"/>
+        <rect x="1890" y="0"    width="18" height="1080" fill="url(#cGV)" opacity="1.00"/>
+        <rect x="1880" y="0"    width="8"  height="1080" fill="url(#cGV)" opacity="0.55"/>
+        <rect x="1875" y="0"    width="3"  height="1080" fill="url(#cGV)" opacity="0.30"/>
+        <rect x="1872" y="0"    width="1"  height="1080" fill="url(#cGV)" opacity="0.18"/>
+
+        {/* ── Top-left corner ── */}
+        <g filter="url(#cGlow)">
+          <rect x="0" y="0" width="220" height="220" fill="url(#cRC)"/>
+          <rect x="6"  y="6"  width="214" height="24" rx="2" fill="url(#cGH)" opacity="0.95"/>
+          <rect x="6"  y="6"  width="24"  height="214" rx="2" fill="url(#cGV)" opacity="0.95"/>
+          <rect x="50" y="50" width="130" height="4"   fill="url(#cGH)" opacity="0.5"/>
+          <rect x="50" y="50" width="4"   height="130" fill="url(#cGV)" opacity="0.5"/>
+          <path d="M54,54 Q90,40 170,52"  fill="none" stroke="#c9a84c" strokeWidth="1.5" strokeDasharray="5 5" opacity="0.4"/>
+          <path d="M54,54 Q40,90 52,170"  fill="none" stroke="#c9a84c" strokeWidth="1.5" strokeDasharray="5 5" opacity="0.4"/>
+          <circle cx="80"  cy="18" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="110" cy="18" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="140" cy="18" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="170" cy="18" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="18" cy="80"  r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="18" cy="110" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="18" cy="140" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="18" cy="170" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <rect x="14" y="14" width="8" height="8" rx="1" fill="#fff8dc" transform="rotate(45,18,18)"/>
+          <g filter="url(#cGlowS)">
+            <line x1="18" y1="6"  x2="18" y2="44" stroke="#fff8dc" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="6"  y1="22" x2="44" y2="22" stroke="#fff8dc" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="18" y1="6"  x2="18" y2="44" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+            <line x1="6"  y1="22" x2="44" y2="22" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+            <circle cx="18" cy="6"  r="4.5" fill="#f5e27a"/>
+            <circle cx="18" cy="44" r="4.5" fill="#f5e27a"/>
+            <circle cx="6"  cy="22" r="4.5" fill="#f5e27a"/>
+            <circle cx="44" cy="22" r="4.5" fill="#f5e27a"/>
+            <circle cx="18" cy="22" r="7"   fill="#fff8dc"/>
+            <circle cx="18" cy="22" r="3.5" fill="#f5e27a"/>
+          </g>
+          <path d="M55,18 C85,10 115,26 145,14 C170,4 190,20 215,16" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+          <path d="M80,18  C82,10 88,8  92,14"  fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.55"/>
+          <path d="M120,16 C122,8 128,6 130,12" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.55"/>
+          <ellipse cx="92"  cy="10" rx="8" ry="4.5" fill="#8a6820" opacity="0.6"  transform="rotate(-20,92,10)"/>
+          <ellipse cx="131" cy="9"  rx="7" ry="4"   fill="#8a6820" opacity="0.55" transform="rotate(15,131,9)"/>
+          <circle cx="198" cy="22" r="5.5" fill="#c9a84c" opacity="0.55"/>
+          <circle cx="207" cy="17" r="4.5" fill="#a67c30" opacity="0.50"/>
+          <circle cx="190" cy="16" r="4.5" fill="#b8902e" opacity="0.48"/>
+          <path d="M18,55 C10,85 26,115 14,145 C4,170 20,190 16,215" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+          <path d="M18,80  C10,82  8,88  14,92"  fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.55"/>
+          <path d="M16,120 C8,122  6,128 12,130" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.55"/>
+          <ellipse cx="10" cy="92"  rx="4.5" ry="8" fill="#8a6820" opacity="0.6"  transform="rotate(20,10,92)"/>
+          <ellipse cx="9"  cy="131" rx="4"   ry="7" fill="#8a6820" opacity="0.55" transform="rotate(-15,9,131)"/>
+          <circle cx="22" cy="198" r="5.5" fill="#c9a84c" opacity="0.55"/>
+          <circle cx="17" cy="207" r="4.5" fill="#a67c30" opacity="0.50"/>
+          <circle cx="16" cy="190" r="4.5" fill="#b8902e" opacity="0.48"/>
+        </g>
+
+        {/* ── Top-right corner (mirror X) ── */}
+        <g transform="scale(-1,1) translate(-1920,0)" filter="url(#cGlow)">
+          <rect x="0" y="0" width="220" height="220" fill="url(#cRC)"/>
+          <rect x="6"  y="6"  width="214" height="24" rx="2" fill="url(#cGH)" opacity="0.95"/>
+          <rect x="6"  y="6"  width="24"  height="214" rx="2" fill="url(#cGV)" opacity="0.95"/>
+          <rect x="50" y="50" width="130" height="4"   fill="url(#cGH)" opacity="0.5"/>
+          <rect x="50" y="50" width="4"   height="130" fill="url(#cGV)" opacity="0.5"/>
+          <circle cx="80"  cy="18" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="110" cy="18" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="140" cy="18" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="170" cy="18" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="18" cy="80"  r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="18" cy="110" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="18" cy="140" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="18" cy="170" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <rect x="14" y="14" width="8" height="8" rx="1" fill="#fff8dc" transform="rotate(45,18,18)"/>
+          <g filter="url(#cGlowS)">
+            <line x1="18" y1="6"  x2="18" y2="44" stroke="#fff8dc" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="6"  y1="22" x2="44" y2="22" stroke="#fff8dc" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="18" y1="6"  x2="18" y2="44" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+            <line x1="6"  y1="22" x2="44" y2="22" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+            <circle cx="18" cy="6"  r="4.5" fill="#f5e27a"/>
+            <circle cx="18" cy="44" r="4.5" fill="#f5e27a"/>
+            <circle cx="6"  cy="22" r="4.5" fill="#f5e27a"/>
+            <circle cx="44" cy="22" r="4.5" fill="#f5e27a"/>
+            <circle cx="18" cy="22" r="7"   fill="#fff8dc"/>
+            <circle cx="18" cy="22" r="3.5" fill="#f5e27a"/>
+          </g>
+          <path d="M55,18 C85,10 115,26 145,14 C170,4 190,20 215,16" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+          <path d="M80,18  C82,10 88,8  92,14"  fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.55"/>
+          <path d="M120,16 C122,8 128,6 130,12" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.55"/>
+          <ellipse cx="92"  cy="10" rx="8" ry="4.5" fill="#8a6820" opacity="0.6"  transform="rotate(-20,92,10)"/>
+          <ellipse cx="131" cy="9"  rx="7" ry="4"   fill="#8a6820" opacity="0.55" transform="rotate(15,131,9)"/>
+          <circle cx="198" cy="22" r="5.5" fill="#c9a84c" opacity="0.55"/>
+          <circle cx="207" cy="17" r="4.5" fill="#a67c30" opacity="0.50"/>
+          <circle cx="190" cy="16" r="4.5" fill="#b8902e" opacity="0.48"/>
+          <path d="M18,55 C10,85 26,115 14,145 C4,170 20,190 16,215" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+          <path d="M18,80  C10,82  8,88  14,92"  fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.55"/>
+          <path d="M16,120 C8,122  6,128 12,130" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.55"/>
+          <ellipse cx="10" cy="92"  rx="4.5" ry="8" fill="#8a6820" opacity="0.6"  transform="rotate(20,10,92)"/>
+          <ellipse cx="9"  cy="131" rx="4"   ry="7" fill="#8a6820" opacity="0.55" transform="rotate(-15,9,131)"/>
+          <circle cx="22" cy="198" r="5.5" fill="#c9a84c" opacity="0.55"/>
+          <circle cx="17" cy="207" r="4.5" fill="#a67c30" opacity="0.50"/>
+          <circle cx="16" cy="190" r="4.5" fill="#b8902e" opacity="0.48"/>
+        </g>
+
+        {/* ── Bottom-left corner (mirror Y) ── */}
+        <g transform="scale(1,-1) translate(0,-1080)" filter="url(#cGlow)">
+          <rect x="0" y="0" width="220" height="220" fill="url(#cRC)"/>
+          <rect x="6"  y="6"  width="214" height="24" rx="2" fill="url(#cGH)" opacity="0.95"/>
+          <rect x="6"  y="6"  width="24"  height="214" rx="2" fill="url(#cGV)" opacity="0.95"/>
+          <rect x="50" y="50" width="130" height="4"   fill="url(#cGH)" opacity="0.5"/>
+          <rect x="50" y="50" width="4"   height="130" fill="url(#cGV)" opacity="0.5"/>
+          <circle cx="80"  cy="18" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="110" cy="18" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="140" cy="18" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="170" cy="18" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="18" cy="80"  r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="18" cy="110" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="18" cy="140" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="18" cy="170" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <rect x="14" y="14" width="8" height="8" rx="1" fill="#fff8dc" transform="rotate(45,18,18)"/>
+          <g filter="url(#cGlowS)">
+            <line x1="18" y1="6"  x2="18" y2="44" stroke="#fff8dc" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="6"  y1="22" x2="44" y2="22" stroke="#fff8dc" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="18" y1="6"  x2="18" y2="44" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+            <line x1="6"  y1="22" x2="44" y2="22" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+            <circle cx="18" cy="6"  r="4.5" fill="#f5e27a"/>
+            <circle cx="18" cy="44" r="4.5" fill="#f5e27a"/>
+            <circle cx="6"  cy="22" r="4.5" fill="#f5e27a"/>
+            <circle cx="44" cy="22" r="4.5" fill="#f5e27a"/>
+            <circle cx="18" cy="22" r="7"   fill="#fff8dc"/>
+            <circle cx="18" cy="22" r="3.5" fill="#f5e27a"/>
+          </g>
+          <path d="M55,18 C85,10 115,26 145,14 C170,4 190,20 215,16" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+          <ellipse cx="92"  cy="10" rx="8" ry="4.5" fill="#8a6820" opacity="0.6"  transform="rotate(-20,92,10)"/>
+          <ellipse cx="131" cy="9"  rx="7" ry="4"   fill="#8a6820" opacity="0.55" transform="rotate(15,131,9)"/>
+          <circle cx="198" cy="22" r="5.5" fill="#c9a84c" opacity="0.55"/>
+          <circle cx="207" cy="17" r="4.5" fill="#a67c30" opacity="0.50"/>
+          <path d="M18,55 C10,85 26,115 14,145 C4,170 20,190 16,215" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+          <ellipse cx="10" cy="92"  rx="4.5" ry="8" fill="#8a6820" opacity="0.6"  transform="rotate(20,10,92)"/>
+          <ellipse cx="9"  cy="131" rx="4"   ry="7" fill="#8a6820" opacity="0.55" transform="rotate(-15,9,131)"/>
+          <circle cx="22" cy="198" r="5.5" fill="#c9a84c" opacity="0.55"/>
+          <circle cx="17" cy="207" r="4.5" fill="#a67c30" opacity="0.50"/>
+        </g>
+
+        {/* ── Bottom-right corner (mirror XY) ── */}
+        <g transform="scale(-1,-1) translate(-1920,-1080)" filter="url(#cGlow)">
+          <rect x="0" y="0" width="220" height="220" fill="url(#cRC)"/>
+          <rect x="6"  y="6"  width="214" height="24" rx="2" fill="url(#cGH)" opacity="0.95"/>
+          <rect x="6"  y="6"  width="24"  height="214" rx="2" fill="url(#cGV)" opacity="0.95"/>
+          <rect x="50" y="50" width="130" height="4"   fill="url(#cGH)" opacity="0.5"/>
+          <rect x="50" y="50" width="4"   height="130" fill="url(#cGV)" opacity="0.5"/>
+          <circle cx="80"  cy="18" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="110" cy="18" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="140" cy="18" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="170" cy="18" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="18" cy="80"  r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="18" cy="110" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <circle cx="18" cy="140" r="4.5" fill="#fff8dc" opacity="0.95"/>
+          <circle cx="18" cy="170" r="3"   fill="#c9a84c" opacity="0.80"/>
+          <rect x="14" y="14" width="8" height="8" rx="1" fill="#fff8dc" transform="rotate(45,18,18)"/>
+          <g filter="url(#cGlowS)">
+            <line x1="18" y1="6"  x2="18" y2="44" stroke="#fff8dc" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="6"  y1="22" x2="44" y2="22" stroke="#fff8dc" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="18" y1="6"  x2="18" y2="44" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+            <line x1="6"  y1="22" x2="44" y2="22" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.8"/>
+            <circle cx="18" cy="6"  r="4.5" fill="#f5e27a"/>
+            <circle cx="18" cy="44" r="4.5" fill="#f5e27a"/>
+            <circle cx="6"  cy="22" r="4.5" fill="#f5e27a"/>
+            <circle cx="44" cy="22" r="4.5" fill="#f5e27a"/>
+            <circle cx="18" cy="22" r="7"   fill="#fff8dc"/>
+            <circle cx="18" cy="22" r="3.5" fill="#f5e27a"/>
+          </g>
+          <path d="M55,18 C85,10 115,26 145,14 C170,4 190,20 215,16" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+          <ellipse cx="92"  cy="10" rx="8" ry="4.5" fill="#8a6820" opacity="0.6"  transform="rotate(-20,92,10)"/>
+          <ellipse cx="131" cy="9"  rx="7" ry="4"   fill="#8a6820" opacity="0.55" transform="rotate(15,131,9)"/>
+          <circle cx="198" cy="22" r="5.5" fill="#c9a84c" opacity="0.55"/>
+          <circle cx="207" cy="17" r="4.5" fill="#a67c30" opacity="0.50"/>
+          <path d="M18,55 C10,85 26,115 14,145 C4,170 20,190 16,215" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+          <ellipse cx="10" cy="92"  rx="4.5" ry="8" fill="#8a6820" opacity="0.6"  transform="rotate(20,10,92)"/>
+          <ellipse cx="9"  cy="131" rx="4"   ry="7" fill="#8a6820" opacity="0.55" transform="rotate(-15,9,131)"/>
+          <circle cx="22" cy="198" r="5.5" fill="#c9a84c" opacity="0.55"/>
+          <circle cx="17" cy="207" r="4.5" fill="#a67c30" opacity="0.50"/>
+        </g>
+
+        {/* ── Top center cross + vine garland ── */}
+        <g transform="translate(960,0)" filter="url(#cGlowS)">
+          <path d="M-380,21 C-320,10 -265,30 -210,16 C-165,5 -120,25 -72,18" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.65"/>
+          <path d="M-310,18 C-308,9 -300,6 -296,14" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.5"/>
+          <path d="M-230,16 C-228,8 -220,5 -217,13" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.5"/>
+          <ellipse cx="-296" cy="8" rx="9" ry="5" fill="#7a5e18" opacity="0.6" transform="rotate(-18,-296,8)"/>
+          <ellipse cx="-217" cy="7" rx="8" ry="4" fill="#8a6820" opacity="0.55" transform="rotate(12,-217,7)"/>
+          <circle cx="-100" cy="26" r="7"   fill="#c9a84c" opacity="0.6"/>
+          <circle cx="-88"  cy="19" r="6"   fill="#a67c30" opacity="0.55"/>
+          <circle cx="-112" cy="18" r="5.5" fill="#b8902e" opacity="0.52"/>
+          <path d="M380,21 C320,10 265,30 210,16 C165,5 120,25 72,18" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.65"/>
+          <path d="M310,18 C308,9 300,6 296,14" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.5"/>
+          <path d="M230,16 C228,8 220,5 217,13" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.5"/>
+          <ellipse cx="296" cy="8" rx="9" ry="5" fill="#7a5e18" opacity="0.6" transform="rotate(18,296,8)"/>
+          <ellipse cx="217" cy="7" rx="8" ry="4" fill="#8a6820" opacity="0.55" transform="rotate(-12,217,7)"/>
+          <circle cx="100" cy="26" r="7"   fill="#c9a84c" opacity="0.6"/>
+          <circle cx="88"  cy="19" r="6"   fill="#a67c30" opacity="0.55"/>
+          <circle cx="112" cy="18" r="5.5" fill="#b8902e" opacity="0.52"/>
+          <line x1="0"   y1="1"  x2="0"   y2="52" stroke="#fff8dc" strokeWidth="8"   strokeLinecap="round"/>
+          <line x1="-24" y1="20" x2="24"  y2="20" stroke="#fff8dc" strokeWidth="8"   strokeLinecap="round"/>
+          <line x1="0"   y1="1"  x2="0"   y2="52" stroke="#f5e27a" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+          <line x1="-24" y1="20" x2="24"  y2="20" stroke="#f5e27a" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+          <circle cx="0"   cy="1"  r="6"   fill="#f5e27a"/>
+          <circle cx="0"   cy="52" r="6"   fill="#f5e27a"/>
+          <circle cx="-24" cy="20" r="6"   fill="#f5e27a"/>
+          <circle cx="24"  cy="20" r="6"   fill="#f5e27a"/>
+          <circle cx="0"   cy="20" r="9"   fill="#fff8dc"/>
+          <circle cx="0"   cy="20" r="4.5" fill="#f5e27a"/>
+        </g>
+
+        {/* ── Bottom center cross + vine (mirror Y) ── */}
+        <g transform="translate(960,1080) scale(1,-1)" filter="url(#cGlowS)">
+          <path d="M-380,21 C-320,10 -265,30 -210,16 C-165,5 -120,25 -72,18" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.65"/>
+          <ellipse cx="-296" cy="8" rx="9" ry="5" fill="#7a5e18" opacity="0.6" transform="rotate(-18,-296,8)"/>
+          <ellipse cx="-217" cy="7" rx="8" ry="4" fill="#8a6820" opacity="0.55" transform="rotate(12,-217,7)"/>
+          <circle cx="-100" cy="26" r="7"   fill="#c9a84c" opacity="0.6"/>
+          <circle cx="-88"  cy="19" r="6"   fill="#a67c30" opacity="0.55"/>
+          <circle cx="-112" cy="18" r="5.5" fill="#b8902e" opacity="0.52"/>
+          <path d="M380,21 C320,10 265,30 210,16 C165,5 120,25 72,18" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.65"/>
+          <ellipse cx="296" cy="8" rx="9" ry="5" fill="#7a5e18" opacity="0.6" transform="rotate(18,296,8)"/>
+          <ellipse cx="217" cy="7" rx="8" ry="4" fill="#8a6820" opacity="0.55" transform="rotate(-12,217,7)"/>
+          <circle cx="100" cy="26" r="7"   fill="#c9a84c" opacity="0.6"/>
+          <circle cx="88"  cy="19" r="6"   fill="#a67c30" opacity="0.55"/>
+          <circle cx="112" cy="18" r="5.5" fill="#b8902e" opacity="0.52"/>
+          <line x1="0"   y1="1"  x2="0"   y2="52" stroke="#fff8dc" strokeWidth="8"   strokeLinecap="round"/>
+          <line x1="-24" y1="20" x2="24"  y2="20" stroke="#fff8dc" strokeWidth="8"   strokeLinecap="round"/>
+          <line x1="0"   y1="1"  x2="0"   y2="52" stroke="#f5e27a" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+          <line x1="-24" y1="20" x2="24"  y2="20" stroke="#f5e27a" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+          <circle cx="0"   cy="1"  r="6"   fill="#f5e27a"/>
+          <circle cx="0"   cy="52" r="6"   fill="#f5e27a"/>
+          <circle cx="-24" cy="20" r="6"   fill="#f5e27a"/>
+          <circle cx="24"  cy="20" r="6"   fill="#f5e27a"/>
+          <circle cx="0"   cy="20" r="9"   fill="#fff8dc"/>
+          <circle cx="0"   cy="20" r="4.5" fill="#f5e27a"/>
+        </g>
+
+        {/* ── Left center cross + vines ── */}
+        <g transform="translate(0,540)">
+          <path d="M21,-340 C10,-280 28,-225 15,-170 C4,-128 22,-90 16,-55" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.65"/>
+          <ellipse cx="9" cy="-267" rx="5" ry="9" fill="#7a5e18" opacity="0.6" transform="rotate(18,9,-267)"/>
+          <ellipse cx="8" cy="-188" rx="4" ry="8" fill="#8a6820" opacity="0.55" transform="rotate(-12,8,-188)"/>
+          <circle cx="26" cy="-100" r="7"   fill="#c9a84c" opacity="0.6"/>
+          <circle cx="19" cy="-88"  r="6"   fill="#a67c30" opacity="0.55"/>
+          <circle cx="18" cy="-112" r="5.5" fill="#b8902e" opacity="0.52"/>
+          <path d="M21,340 C10,280 28,225 15,170 C4,128 22,90 16,55" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.65"/>
+          <ellipse cx="9" cy="267" rx="5" ry="9" fill="#7a5e18" opacity="0.6" transform="rotate(-18,9,267)"/>
+          <ellipse cx="8" cy="188" rx="4" ry="8" fill="#8a6820" opacity="0.55" transform="rotate(12,8,188)"/>
+          <circle cx="26" cy="100" r="7"   fill="#c9a84c" opacity="0.6"/>
+          <circle cx="19" cy="88"  r="6"   fill="#a67c30" opacity="0.55"/>
+          <circle cx="18" cy="112" r="5.5" fill="#b8902e" opacity="0.52"/>
+          <g filter="url(#cGlowS)">
+            <line x1="2"  y1="0"   x2="52" y2="0"  stroke="#fff8dc" strokeWidth="8"   strokeLinecap="round"/>
+            <line x1="20" y1="-24" x2="20" y2="24" stroke="#fff8dc" strokeWidth="8"   strokeLinecap="round"/>
+            <line x1="2"  y1="0"   x2="52" y2="0"  stroke="#f5e27a" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+            <line x1="20" y1="-24" x2="20" y2="24" stroke="#f5e27a" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+            <circle cx="2"  cy="0"   r="6"   fill="#f5e27a"/>
+            <circle cx="52" cy="0"   r="6"   fill="#f5e27a"/>
+            <circle cx="20" cy="-24" r="6"   fill="#f5e27a"/>
+            <circle cx="20" cy="24"  r="6"   fill="#f5e27a"/>
+            <circle cx="20" cy="0"   r="9"   fill="#fff8dc"/>
+            <circle cx="20" cy="0"   r="4.5" fill="#f5e27a"/>
+          </g>
+        </g>
+
+        {/* ── Right center cross + vines (mirror X) ── */}
+        <g transform="translate(1920,540) scale(-1,1)">
+          <path d="M21,-340 C10,-280 28,-225 15,-170 C4,-128 22,-90 16,-55" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.65"/>
+          <ellipse cx="9" cy="-267" rx="5" ry="9" fill="#7a5e18" opacity="0.6" transform="rotate(18,9,-267)"/>
+          <ellipse cx="8" cy="-188" rx="4" ry="8" fill="#8a6820" opacity="0.55" transform="rotate(-12,8,-188)"/>
+          <circle cx="26" cy="-100" r="7"   fill="#c9a84c" opacity="0.6"/>
+          <circle cx="19" cy="-88"  r="6"   fill="#a67c30" opacity="0.55"/>
+          <circle cx="18" cy="-112" r="5.5" fill="#b8902e" opacity="0.52"/>
+          <path d="M21,340 C10,280 28,225 15,170 C4,128 22,90 16,55" fill="none" stroke="#c9a84c" strokeWidth="2.5" strokeLinecap="round" opacity="0.65"/>
+          <ellipse cx="9" cy="267" rx="5" ry="9" fill="#7a5e18" opacity="0.6" transform="rotate(-18,9,267)"/>
+          <ellipse cx="8" cy="188" rx="4" ry="8" fill="#8a6820" opacity="0.55" transform="rotate(12,8,188)"/>
+          <circle cx="26" cy="100" r="7"   fill="#c9a84c" opacity="0.6"/>
+          <circle cx="19" cy="88"  r="6"   fill="#a67c30" opacity="0.55"/>
+          <circle cx="18" cy="112" r="5.5" fill="#b8902e" opacity="0.52"/>
+          <g filter="url(#cGlowS)">
+            <line x1="2"  y1="0"   x2="52" y2="0"  stroke="#fff8dc" strokeWidth="8"   strokeLinecap="round"/>
+            <line x1="20" y1="-24" x2="20" y2="24" stroke="#fff8dc" strokeWidth="8"   strokeLinecap="round"/>
+            <line x1="2"  y1="0"   x2="52" y2="0"  stroke="#f5e27a" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+            <line x1="20" y1="-24" x2="20" y2="24" stroke="#f5e27a" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+            <circle cx="2"  cy="0"   r="6"   fill="#f5e27a"/>
+            <circle cx="52" cy="0"   r="6"   fill="#f5e27a"/>
+            <circle cx="20" cy="-24" r="6"   fill="#f5e27a"/>
+            <circle cx="20" cy="24"  r="6"   fill="#f5e27a"/>
+            <circle cx="20" cy="0"   r="9"   fill="#fff8dc"/>
+            <circle cx="20" cy="0"   r="4.5" fill="#f5e27a"/>
+          </g>
+        </g>
+      </svg>
+
+      {/* ── Logo — top right ── */}
+      <div className="church-logo-wrap">
+        <div className="church-logo-ring-outer" />
+        <div className="church-logo-ring-mid" />
+        <div className="church-logo-ring-inner" />
+        <div className="church-logo-body">
+          <svg viewBox="0 0 60 60" width="58" height="58" xmlns="http://www.w3.org/2000/svg" className="church-logo-svg">
+            <line x1="30" y1="5"  x2="30" y2="55" stroke="#c9a84c" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="8"  y1="20" x2="52" y2="20" stroke="#c9a84c" strokeWidth="6" strokeLinecap="round"/>
+            <line x1="30" y1="5"  x2="30" y2="55" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+            <line x1="8"  y1="20" x2="52" y2="20" stroke="#f5e27a" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+            <circle cx="30" cy="5"  r="5" fill="#f5e27a"/>
+            <circle cx="30" cy="55" r="5" fill="#f5e27a"/>
+            <circle cx="8"  cy="20" r="5" fill="#f5e27a"/>
+            <circle cx="52" cy="20" r="5" fill="#f5e27a"/>
+            <circle cx="30" cy="20" r="8" fill="#fff8dc"/>
+            <circle cx="30" cy="20" r="4" fill="#f5e27a"/>
+          </svg>
+          <span className="church-logo-text">LOGO</span>
+        </div>
+      </div>
+
+      {/* ── Reading panel — bottom ── */}
+      <div className="church-reading-wrap">
+        <div className="church-reading-topbar" />
+        <div className="church-reading-midbar" />
+        <div className="church-reading-panel">
+          {/* Left ornament */}
+          <div className="church-panel-side church-panel-side--left">
+            <svg viewBox="0 0 90 120" width="90" height="120" xmlns="http://www.w3.org/2000/svg">
+              <path d="M45,10 C36,35 54,55 40,80 C30,100 48,108 45,118" fill="none" stroke="#c9a84c" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+              <path d="M43,35 C34,33 28,38 34,44" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.5"/>
+              <path d="M41,70 C32,68 26,73 32,79" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.5"/>
+              <ellipse cx="30" cy="44" rx="9" ry="5" fill="#7a5e18" opacity="0.6" transform="rotate(-30,30,44)"/>
+              <ellipse cx="28" cy="79" rx="8" ry="4.5" fill="#8a6820" opacity="0.55" transform="rotate(20,28,79)"/>
+              <circle cx="52" cy="55" r="7"   fill="#c9a84c" opacity="0.55"/>
+              <circle cx="43" cy="49" r="6"   fill="#a67c30" opacity="0.50"/>
+              <circle cx="60" cy="49" r="5.5" fill="#b8902e" opacity="0.48"/>
+              <circle cx="52" cy="42" r="5"   fill="#f5e27a" opacity="0.38"/>
+              <line x1="45" y1="4"  x2="45" y2="22" stroke="#fff8dc" strokeWidth="5" strokeLinecap="round"/>
+              <line x1="36" y1="12" x2="54" y2="12" stroke="#fff8dc" strokeWidth="5" strokeLinecap="round"/>
+              <circle cx="45" cy="4"  r="4" fill="#f5e27a"/>
+              <circle cx="45" cy="22" r="4" fill="#f5e27a"/>
+              <circle cx="36" cy="12" r="4" fill="#f5e27a"/>
+              <circle cx="54" cy="12" r="4" fill="#f5e27a"/>
+              <circle cx="45" cy="12" r="6" fill="#fff8dc"/>
+              <circle cx="45" cy="12" r="3" fill="#f5e27a"/>
+            </svg>
+          </div>
+          {/* Right ornament */}
+          <div className="church-panel-side church-panel-side--right">
+            <svg viewBox="0 0 90 120" width="90" height="120" xmlns="http://www.w3.org/2000/svg">
+              <path d="M45,10 C36,35 54,55 40,80 C30,100 48,108 45,118" fill="none" stroke="#c9a84c" strokeWidth="2" strokeLinecap="round" opacity="0.65"/>
+              <path d="M43,35 C34,33 28,38 34,44" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.5"/>
+              <path d="M41,70 C32,68 26,73 32,79" fill="none" stroke="#a67c30" strokeWidth="1.5" opacity="0.5"/>
+              <ellipse cx="30" cy="44" rx="9" ry="5" fill="#7a5e18" opacity="0.6" transform="rotate(-30,30,44)"/>
+              <ellipse cx="28" cy="79" rx="8" ry="4.5" fill="#8a6820" opacity="0.55" transform="rotate(20,28,79)"/>
+              <circle cx="52" cy="55" r="7"   fill="#c9a84c" opacity="0.55"/>
+              <circle cx="43" cy="49" r="6"   fill="#a67c30" opacity="0.50"/>
+              <circle cx="60" cy="49" r="5.5" fill="#b8902e" opacity="0.48"/>
+              <circle cx="52" cy="42" r="5"   fill="#f5e27a" opacity="0.38"/>
+              <line x1="45" y1="4"  x2="45" y2="22" stroke="#fff8dc" strokeWidth="5" strokeLinecap="round"/>
+              <line x1="36" y1="12" x2="54" y2="12" stroke="#fff8dc" strokeWidth="5" strokeLinecap="round"/>
+              <circle cx="45" cy="4"  r="4" fill="#f5e27a"/>
+              <circle cx="45" cy="22" r="4" fill="#f5e27a"/>
+              <circle cx="36" cy="12" r="4" fill="#f5e27a"/>
+              <circle cx="54" cy="12" r="4" fill="#f5e27a"/>
+              <circle cx="45" cy="12" r="6" fill="#fff8dc"/>
+              <circle cx="45" cy="12" r="3" fill="#f5e27a"/>
+            </svg>
+          </div>
+          {visible && line1 && (
+            <div
+              className="church-reading-line1"
+              dir={isRtl(line1) ? 'rtl' : 'ltr'}
+              style={{ fontSize: `${fontSize}px`, fontFamily, color: textColor, textAlign: alignment as any }}
+            >{line1}</div>
+          )}
+          {visible && line1 && line2 && (
+            <div className="church-reading-divider">
+              <div className="church-reading-divider-line" />
+              <div className="church-reading-divider-diamond" />
+              <div className="church-reading-divider-line" />
+            </div>
+          )}
+          {visible && line2 && (
+            <div
+              className="church-reading-line2"
+              dir={isRtl(line2) ? 'rtl' : 'ltr'}
+              style={{ fontSize: `${Math.round(fontSize * 0.6)}px`, fontFamily, color: textColor, textAlign: alignment as any }}
+            >{line2}</div>
+          )}
+        </div>
+      </div>
+
     </div>
   )
 }
