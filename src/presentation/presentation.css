@@ -79,7 +79,6 @@ html, body, #presentation-root {
 }
 
 /* ── Church border overlay ── */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Amiri:wght@400;700&display=swap');
 
 .church-overlay {
   position: absolute;

@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openPresentationWindow: () => ipcRenderer.invoke('open-presentation-window'),
   closePresentationWindow: () => ipcRenderer.invoke('close-presentation-window'),
   updatePresentation: (data: any) => ipcRenderer.invoke('update-presentation', data),
+  getPresentationData: () => ipcRenderer.invoke('get-presentation-data'),
   setPresentationFullscreen: (enable: boolean) => ipcRenderer.invoke('presentation-fullscreen', enable),
   onPresentationUpdate: (callback: (data: any) => void) => {
     const listener = (_: any, data: any) => callback(data)

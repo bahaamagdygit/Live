@@ -28,6 +28,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     bgColor: '#000000',
     bgOpacity: 70,
     alignment: 'center',
+    line1Bold: true,
+    line2Bold: false,
   },
   logoSettings: {
     filePath: '',
@@ -222,6 +224,8 @@ function App() {
       logoOpacity: logoSettings.opacity,
       logoVisible: logoSettings.visible,
       logoAnimation: logoSettings.animation,
+      fallbackBase64: cameraFallback.base64 || '',
+      fallbackFit: cameraFallback.fit,
     })
   }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback])
 
@@ -373,6 +377,7 @@ function App() {
             size: updatedLogoSettings.size,
             opacity: updatedLogoSettings.opacity,
             visible: updatedLogoSettings.visible,
+            animation: updatedLogoSettings.animation,
           },
           cameraFallback: {
             filePath: newSettings.cameraFallback.filePath,

@@ -21,6 +21,13 @@ const FONT_FAMILIES = [
   'Impact',
   'Comic Sans MS',
   'Courier New',
+  // Arabic fonts
+  'Cairo',
+  'Tajawal',
+  'Lalezar',
+  'Reem Kufi',
+  'Noto Kufi Arabic',
+  'Amiri',
 ]
 
 export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsModalProps) {
@@ -270,6 +277,31 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
                     value={localSettings.overlaySettings.fontSize}
                     onChange={(e) => updateOverlay({ fontSize: Number(e.target.value) })}
                   />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Line 1 (Header)</label>
+                  <label className="form-check">
+                    <input
+                      type="checkbox"
+                      checked={localSettings.overlaySettings.line1Bold ?? true}
+                      onChange={(e) => updateOverlay({ line1Bold: e.target.checked })}
+                    />
+                    <span className="text-bold">Bold</span>
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Line 2 (Subtitle)</label>
+                  <label className="form-check">
+                    <input
+                      type="checkbox"
+                      checked={localSettings.overlaySettings.line2Bold ?? false}
+                      onChange={(e) => updateOverlay({ line2Bold: e.target.checked })}
+                    />
+                    <span className="text-bold">Bold</span>
+                  </label>
                 </div>
               </div>
 

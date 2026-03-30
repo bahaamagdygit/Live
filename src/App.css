@@ -1534,6 +1534,10 @@ kbd {
   height: 14px;
 }
 
+.text-bold {
+  font-weight: bold;
+}
+
 .form-color {
   width: 40px;
   height: 32px;

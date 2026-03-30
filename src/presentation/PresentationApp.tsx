@@ -10,6 +10,8 @@ interface PresentationData {
   bgColor: string
   bgOpacity: number
   alignment: 'right' | 'center' | 'left'
+  line1Bold?: boolean
+  line2Bold?: boolean
   slideNumber?: number
   totalSlides?: number
   cameraDeviceId?: string
@@ -293,6 +295,8 @@ export default function PresentationApp() {
         fontFamily={data.fontFamily}
         textColor={data.textColor}
         alignment={data.alignment}
+        line1Bold={data.line1Bold ?? true}
+        line2Bold={data.line2Bold ?? false}
         logoBase64={data.logoBase64 || ''}
         logoPosition={data.logoPosition || 'top-right'}
         logoSize={data.logoSize ?? 180}
@@ -312,9 +316,11 @@ export default function PresentationApp() {
 }
 
 function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, textColor, alignment,
+  line1Bold, line2Bold,
   logoBase64, logoPosition, logoSize, logoOpacity, logoVisible, logoAnimation }: {
   line1: string; line2: string; visible: boolean;
   fontSize: number; fontFamily: string; textColor: string; alignment: string;
+  line1Bold: boolean; line2Bold: boolean;
   logoBase64: string; logoPosition: string; logoSize: number; logoOpacity: number;
   logoVisible: boolean; logoAnimation: string;
 }) {
@@ -783,7 +789,7 @@ function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, text
             <div
               className="church-reading-line1"
               dir={isRtl(line1) ? 'rtl' : 'ltr'}
-              style={{ fontSize: `${fontSize}px`, fontFamily, color: textColor, textAlign: alignment as any }}
+              style={{ fontSize: `${fontSize}px`, fontFamily, color: textColor, textAlign: alignment as any, fontWeight: line1Bold ? 'bold' : 'normal' }}
             >{line1}</div>
           )}
           {visible && line1 && line2 && (
@@ -797,7 +803,7 @@ function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, text
             <div
               className="church-reading-line2"
               dir={isRtl(line2) ? 'rtl' : 'ltr'}
-              style={{ fontSize: `${Math.round(fontSize * 0.6)}px`, fontFamily, color: textColor, textAlign: alignment as any }}
+              style={{ fontSize: `${Math.round(fontSize * 0.6)}px`, fontFamily, color: textColor, textAlign: alignment as any, fontWeight: line2Bold ? 'bold' : 'normal' }}
             >{line2}</div>
           )}
         </div>

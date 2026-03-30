@@ -61,6 +61,7 @@ let mainWindow: BrowserWindow | null = null
 let presentationWindow: BrowserWindow | null = null
 let pptxControllerWindow: BrowserWindow | null = null
 let lastSlidesData: any = null
+let lastPresentationData: any = null
 let ffmpegStreamProcess: ChildProcess | null = null
 let ffmpegRecordProcess: ChildProcess | null = null
 let streamStartTime: number | null = null
@@ -817,6 +818,15 @@ ipcMain.handle('open-presentation-window', async () => {
     await presentationWindow.loadFile(path.join(__dirname, '../dist/presentation.html'))
   }
 
+  // Re-send last known data once the window's renderer is ready (delay lets React mount)
+  presentationWindow.webContents.on('did-finish-load', () => {
+    setTimeout(() => {
+      if (lastPresentationData && presentationWindow && !presentationWindow.isDestroyed()) {
+        presentationWindow.webContents.send('presentation-update', lastPresentationData)
+      }
+    }, 300)
+  })
+
   presentationWindow.on('closed', () => {
     presentationWindow = null
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -835,7 +845,12 @@ ipcMain.handle('close-presentation-window', async () => {
   return { success: true }
 })
 
+ipcMain.handle('get-presentation-data', async () => {
+  return lastPresentationData
+})
+
 ipcMain.handle('update-presentation', async (_event, data: any) => {
+  lastPresentationData = data
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.webContents.send('presentation-update', data)
     return { success: true }

@@ -29,6 +29,8 @@ export interface OverlaySettings {
   bgColor: string
   bgOpacity: number
   alignment: 'right' | 'center' | 'left'
+  line1Bold: boolean
+  line2Bold: boolean
 }
 
 export interface LogoSettings {
