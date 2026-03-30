@@ -7,7 +7,7 @@ import { SettingsModal } from './components/SettingsModal'
 import { useCameras } from './hooks/useCameras'
 import { useStream } from './hooks/useStream'
 import { useSlides } from './hooks/useSlides'
-import { AppSettings, OverlaySettings, LogoSettings, StreamConfig } from './types'
+import { AppSettings, OverlaySettings, LogoSettings, StreamConfig, CameraFallbackSettings } from './types'
 import './App.css'
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -37,6 +37,11 @@ const DEFAULT_SETTINGS: AppSettings = {
     visible: false,
     animation: 'none' as const,
   },
+  cameraFallback: {
+    filePath: '',
+    base64: '',
+    fit: 'cover',
+  },
   hotkeys: {
     toggleText: 'Space',
     nextSlide: 'Right',
@@ -54,6 +59,7 @@ function App() {
     DEFAULT_SETTINGS.overlaySettings
   )
   const [logoSettings, setLogoSettings] = useState<LogoSettings>(DEFAULT_SETTINGS.logoSettings)
+  const [cameraFallback, setCameraFallback] = useState<CameraFallbackSettings>(DEFAULT_SETTINGS.cameraFallback)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [isPresentationOpen, setIsPresentationOpen] = useState(false)
@@ -82,17 +88,26 @@ function App() {
               ...result.settings.overlaySettings,
             },
             logoSettings: { ...DEFAULT_SETTINGS.logoSettings, ...result.settings.logoSettings },
+            cameraFallback: { ...DEFAULT_SETTINGS.cameraFallback, ...result.settings.cameraFallback },
             hotkeys: { ...DEFAULT_SETTINGS.hotkeys, ...result.settings.hotkeys },
           }
           setSettings(loaded)
           setOverlaySettings(loaded.overlaySettings)
           setLogoSettings(loaded.logoSettings)
+          setCameraFallback(loaded.cameraFallback)
 
           // Load logo data if path exists
           if (loaded.logoSettings.filePath && !loaded.logoSettings.base64) {
             const logoData = await window.electronAPI.getLogoData(loaded.logoSettings.filePath)
             if (logoData?.success && logoData.base64) {
               setLogoSettings((prev) => ({ ...prev, base64: logoData.base64 }))
+            }
+          }
+          // Load fallback image data if path exists
+          if (loaded.cameraFallback.filePath && !loaded.cameraFallback.base64) {
+            const imgData = await window.electronAPI.getLogoData(loaded.cameraFallback.filePath)
+            if (imgData?.success && imgData.base64) {
+              setCameraFallback((prev) => ({ ...prev, base64: imgData.base64 }))
             }
           }
         }
@@ -208,7 +223,7 @@ function App() {
       logoVisible: logoSettings.visible,
       logoAnimation: logoSettings.animation,
     })
-  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings])
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback])
 
   // ── PPTX Controller window ──────────────────────────────────────────────────
 
@@ -313,6 +328,8 @@ function App() {
           logoOpacity: logoSettings.opacity,
           logoVisible: logoSettings.visible,
           logoAnimation: logoSettings.animation,
+          fallbackBase64: cameraFallback.base64 || '',
+          fallbackFit: cameraFallback.fit,
         })
       }
     }
@@ -343,6 +360,7 @@ function App() {
       }
 
       setLogoSettings(updatedLogoSettings)
+      setCameraFallback(newSettings.cameraFallback)
 
       // Save to electron-store
       if (window.electronAPI) {
@@ -355,6 +373,10 @@ function App() {
             size: updatedLogoSettings.size,
             opacity: updatedLogoSettings.opacity,
             visible: updatedLogoSettings.visible,
+          },
+          cameraFallback: {
+            filePath: newSettings.cameraFallback.filePath,
+            fit: newSettings.cameraFallback.fit,
           },
           hotkeys: newSettings.hotkeys,
         })
@@ -558,6 +580,7 @@ function App() {
           ...settings,
           overlaySettings,
           logoSettings,
+          cameraFallback,
         }}
         onSave={handleSaveSettings}
         onClose={() => setIsSettingsOpen(false)}

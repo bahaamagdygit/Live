@@ -22,6 +22,8 @@ interface PresentationData {
   cameraSaturation?: number
   cameraFlipH?: boolean
   cameraFlipV?: boolean
+  fallbackBase64?: string
+  fallbackFit?: 'cover' | 'contain' | 'fill'
   logoBase64?: string
   logoPosition?: 'top-right' | 'top-left' | 'top-center' | 'bottom-right' | 'bottom-left'
   logoSize?: number
@@ -50,48 +52,157 @@ export default function PresentationApp() {
   const targetRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const [cameraFailed, setCameraFailed] = useState(false)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // Start/switch camera stream when deviceId changes
+  const onCameraError = (reason: string) => {
+    console.warn('[Camera]', reason)
+    setCameraFailed(true)
+  }
+
+  const onCameraOk = () => {
+    setCameraFailed(false)
+  }
+
+  // Case 1 — open stream; Case 2 — black frame detection via canvas
   useEffect(() => {
     const deviceId = data.cameraDeviceId
-    if (!deviceId) return
+    if (!deviceId) {
+      onCameraError('No device found')
+      return
+    }
 
-    const startStream = async () => {
+    let stopped = false
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let brightnessInterval: ReturnType<typeof setInterval> | null = null
+
+    const stopBrightnessCheck = () => {
+      if (brightnessInterval) { clearInterval(brightnessInterval); brightnessInterval = null }
+    }
+
+    const stopStream = () => {
+      stopBrightnessCheck()
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop())
         streamRef.current = null
       }
+      if (videoRef.current) videoRef.current.srcObject = null
+    }
+
+    // Case 2 — frozen/placeholder frame detection by comparing two frames 600ms apart
+    const captureFrame = (): Uint8ClampedArray | null => {
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) return null
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+      canvas.width = 32
+      canvas.height = 18
       try {
-        const videoConstraints: MediaTrackConstraints = deviceId.length > 5
-          ? { deviceId: { exact: deviceId }, width: { ideal: 3840 }, height: { ideal: 2160 } }
-          : { width: { ideal: 3840 }, height: { ideal: 2160 } }
-        const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false })
-        streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-        }
-      } catch (err) {
-        // fallback to lower resolution
+        ctx.drawImage(video, 0, 0, 32, 18)
+        return ctx.getImageData(0, 0, 32, 18).data
+      } catch { return null }
+    }
+
+    const framesAreSame = (a: Uint8ClampedArray, b: Uint8ClampedArray): boolean => {
+      let diff = 0
+      // Sample every 8th pixel channel for speed
+      for (let i = 0; i < a.length; i += 8) {
+        diff += Math.abs(a[i] - b[i])
+      }
+      // If total diff < 20 across all sampled pixels → frozen
+      return diff < 20
+    }
+
+    const startBrightnessCheck = () => {
+      stopBrightnessCheck()
+      brightnessInterval = setInterval(() => {
+        const frame1 = captureFrame()
+        if (!frame1) return
+        // Take second frame 600ms later and compare
+        setTimeout(() => {
+          if (!brightnessInterval) return // was cleared
+          const frame2 = captureFrame()
+          if (!frame2) return
+          if (framesAreSame(frame1, frame2)) {
+            onCameraError('Black frame detected — showing fallback')
+          } else {
+            onCameraOk()
+          }
+        }, 600)
+      }, 2000)
+    }
+
+    const startStream = async () => {
+      if (stopped) return
+      stopStream()
+      onCameraOk()
+
+      const base: MediaTrackConstraints = deviceId.length > 5
+        ? { deviceId: { ideal: deviceId } } : {}
+
+      const attempts: MediaStreamConstraints[] = [
+        { video: { ...base, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+        { video: { ...base }, audio: false },
+        { video: true, audio: false },
+      ]
+
+      let stream: MediaStream | null = null
+      let lastError = ''
+
+      for (const constraints of attempts) {
         try {
-          const fallback: MediaTrackConstraints = deviceId.length > 5
-            ? { deviceId: { ideal: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-            : { width: { ideal: 1920 }, height: { ideal: 1080 } }
-          const stream = await navigator.mediaDevices.getUserMedia({ video: fallback, audio: false })
-          streamRef.current = stream
-          if (videoRef.current) videoRef.current.srcObject = stream
-        } catch (err2) {
-          console.warn('Presentation camera error:', err2)
+          stream = await navigator.mediaDevices.getUserMedia(constraints)
+          break
+        } catch (err: any) {
+          lastError = err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError'
+            ? 'No device found'
+            : err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError'
+              ? 'Permission denied'
+              : err?.message || 'Camera error'
         }
+      }
+
+      if (stopped) { stream?.getTracks().forEach(t => t.stop()); return }
+
+      // Case 1 — all attempts failed
+      if (!stream) {
+        onCameraError(lastError)
+        retryTimer = setTimeout(() => { if (!stopped) startStream() }, 4000)
+        return
+      }
+
+      streamRef.current = stream
+      if (videoRef.current) videoRef.current.srcObject = stream
+
+      // Handle track ending (device disconnected)
+      const track = stream.getVideoTracks()[0]
+      if (track) {
+        track.addEventListener('ended', () => {
+          if (!stopped) {
+            onCameraError('No device found')
+            retryTimer = setTimeout(() => { if (!stopped) startStream() }, 4000)
+          }
+        })
+      }
+
+      // Start Case 2 brightness check after video begins playing
+      const video = videoRef.current
+      if (video) {
+        const onPlaying = () => {
+          video.removeEventListener('playing', onPlaying)
+          startBrightnessCheck()
+        }
+        video.addEventListener('playing', onPlaying)
       }
     }
 
     startStream()
 
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop())
-        streamRef.current = null
-      }
+      stopped = true
+      if (retryTimer) clearTimeout(retryTimer)
+      stopStream()
     }
   }, [data.cameraDeviceId])
 
@@ -145,6 +256,18 @@ export default function PresentationApp() {
     <div className="presentation-root">
       {/* Black background always */}
       <div className="presentation-bg" />
+
+      {/* Hidden canvas used for brightness frame analysis (Case 2) */}
+      <canvas ref={canvasRef} className="presentation-canvas-hidden" />
+
+      {/* Fallback image — always in DOM, z-index covers video when cameraFailed */}
+      {data.fallbackBase64 && (
+        <img
+          src={data.fallbackBase64}
+          className={`presentation-fallback${cameraFailed ? '' : ' presentation-fallback--hidden'}`}
+          alt=""
+        />
+      )}
 
       {/* Camera feed */}
       <video

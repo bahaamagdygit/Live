@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { AppSettings, StreamConfig, OverlaySettings, LogoSettings } from '../types'
+import { AppSettings, StreamConfig, OverlaySettings, LogoSettings, CameraFallbackSettings } from '../types'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -8,7 +8,7 @@ interface SettingsModalProps {
   onClose: () => void
 }
 
-type TabId = 'stream' | 'overlay' | 'logo' | 'hotkeys'
+type TabId = 'stream' | 'overlay' | 'logo' | 'camera' | 'hotkeys'
 
 const FONT_FAMILIES = [
   'Arial',
@@ -28,10 +28,13 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings)
   const [logoPreview, setLogoPreview] = useState<string>('')
   const [logoLoading, setLogoLoading] = useState(false)
+  const [fallbackPreview, setFallbackPreview] = useState<string>('')
+  const [fallbackLoading, setFallbackLoading] = useState(false)
 
   useEffect(() => {
     setLocalSettings(settings)
     setLogoPreview(settings.logoSettings.base64 || '')
+    setFallbackPreview(settings.cameraFallback.base64 || '')
   }, [settings, isOpen])
 
   if (!isOpen) return null
@@ -55,6 +58,35 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
       ...prev,
       logoSettings: { ...prev.logoSettings, ...patch },
     }))
+  }
+
+  const updateFallback = (patch: Partial<CameraFallbackSettings>) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      cameraFallback: { ...prev.cameraFallback, ...patch },
+    }))
+  }
+
+  const handleSelectFallback = async () => {
+    if (!window.electronAPI) return
+    setFallbackLoading(true)
+    try {
+      const result = await window.electronAPI.selectLogo()
+      if (result.success && result.filePath) {
+        const imgData = await window.electronAPI.getLogoData(result.filePath)
+        if (imgData.success && imgData.base64) {
+          updateFallback({ filePath: result.filePath, base64: imgData.base64 })
+          setFallbackPreview(imgData.base64)
+        }
+      }
+    } finally {
+      setFallbackLoading(false)
+    }
+  }
+
+  const handleRemoveFallback = () => {
+    updateFallback({ filePath: '', base64: '' })
+    setFallbackPreview('')
   }
 
   const updateHotkey = (key: string, value: string) => {
@@ -91,6 +123,7 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
     { id: 'stream', label: 'Stream', icon: '📡' },
     { id: 'overlay', label: 'Overlay', icon: '💬' },
     { id: 'logo', label: 'Logo', icon: '🖼️' },
+    { id: 'camera', label: 'Camera', icon: '🎥' },
     { id: 'hotkeys', label: 'Hotkeys', icon: '⌨️' },
   ]
 
@@ -451,6 +484,60 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
                   <span>Show logo on preview</span>
                 </label>
               </div>
+            </div>
+          )}
+
+          {/* CAMERA TAB */}
+          {activeTab === 'camera' && (
+            <div className="settings-section">
+              <h3 className="settings-section__title">Camera Fallback Background</h3>
+              <p className="settings-section__desc">
+                This image is shown on the presentation screen when the camera is disconnected, has an error, or is not available.
+              </p>
+
+              {/* Preview */}
+              <div className="logo-preview-wrap" style={{ marginBottom: 16 }}>
+                {fallbackPreview ? (
+                  <img
+                    src={fallbackPreview}
+                    alt="Fallback preview"
+                    style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 6, background: '#000' }}
+                  />
+                ) : (
+                  <div className="logo-preview-empty" style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f0f1a', borderRadius: 6, color: '#555', fontSize: 13 }}>
+                    No fallback image selected
+                  </div>
+                )}
+              </div>
+
+              <div className="form-row">
+                <button type="button" className="btn btn--secondary" onClick={handleSelectFallback} disabled={fallbackLoading}>
+                  {fallbackLoading ? 'Loading...' : fallbackPreview ? 'Change Image' : 'Select Image'}
+                </button>
+                {fallbackPreview && (
+                  <button type="button" className="btn btn--ghost" onClick={handleRemoveFallback}>
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              {fallbackPreview && (
+                <div className="form-row" style={{ marginTop: 16 }}>
+                  <div className="form-group">
+                    <label className="form-label">Image Fit</label>
+                    <select
+                      className="form-select"
+                      title="Fallback image fit"
+                      value={localSettings.cameraFallback.fit}
+                      onChange={e => updateFallback({ fit: e.target.value as CameraFallbackSettings['fit'] })}
+                    >
+                      <option value="cover">Cover (fill screen)</option>
+                      <option value="contain">Contain (letterbox)</option>
+                      <option value="fill">Stretch</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

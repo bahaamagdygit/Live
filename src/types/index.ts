@@ -41,10 +41,17 @@ export interface LogoSettings {
   animation: 'none' | 'rotate-right' | 'rotate-left' | 'flip-y' | 'flip-x' | 'pulse' | 'bounce'
 }
 
+export interface CameraFallbackSettings {
+  filePath: string
+  base64?: string
+  fit: 'cover' | 'contain' | 'fill'
+}
+
 export interface AppSettings {
   streamConfig: StreamConfig
   overlaySettings: OverlaySettings
   logoSettings: LogoSettings
+  cameraFallback: CameraFallbackSettings
   hotkeys: {
     toggleText: string
     nextSlide: string
