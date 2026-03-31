@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     alignment: 'center',
     line1Bold: true,
     line2Bold: false,
+    panelLayout: 'full' as const,
   },
   logoSettings: {
     filePath: '',

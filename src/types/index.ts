@@ -31,6 +31,7 @@ export interface OverlaySettings {
   alignment: 'right' | 'center' | 'left'
   line1Bold: boolean
   line2Bold: boolean
+  panelLayout: 'full' | 'left' | 'right'
 }
 
 export interface LogoSettings {

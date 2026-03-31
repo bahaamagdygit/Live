@@ -379,6 +379,22 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
                     <option value="right">Right (RTL)</option>
                   </select>
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label">Panel Layout</label>
+                  <select
+                    className="form-select"
+                    title="Panel Layout"
+                    value={localSettings.overlaySettings.panelLayout ?? 'full'}
+                    onChange={(e) =>
+                      updateOverlay({ panelLayout: e.target.value as 'full' | 'left' | 'right' })
+                    }
+                  >
+                    <option value="full">Full Width</option>
+                    <option value="left">Left Half</option>
+                    <option value="right">Right Half</option>
+                  </select>
+                </div>
               </div>
 
               {/* Preview */}

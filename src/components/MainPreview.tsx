@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { OverlaySettings, LogoSettings, CameraFallbackSettings } from '../types'
 import { ChurchBorderOverlay } from '../presentation/PresentationApp'
 import '../presentation/presentation.css'
@@ -139,6 +139,7 @@ export function MainPreview({
           logoOpacity={logoSettings.opacity}
           logoVisible={logoSettings.visible}
           logoAnimation={logoSettings.animation || 'none'}
+          panelLayout={overlaySettings.panelLayout ?? 'full'}
         />
 
         {/* No camera placeholder */}
