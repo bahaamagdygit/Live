@@ -33,6 +33,7 @@ interface ElectronAPI {
   openPresentationWindow: () => Promise<{ success: boolean; alreadyOpen?: boolean; error?: string }>
   closePresentationWindow: () => Promise<{ success: boolean }>
   updatePresentation: (data: any) => Promise<{ success: boolean; error?: string }>
+  getPresentationData: () => Promise<any>
   setPresentationFullscreen: (enable: boolean) => Promise<{ success: boolean }>
   onPresentationUpdate: (callback: (data: any) => void) => () => void
   onPresentationWindowClosed: (callback: () => void) => () => void

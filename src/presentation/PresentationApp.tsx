@@ -48,9 +48,6 @@ const DEFAULT_DATA: PresentationData = {
 
 export default function PresentationApp() {
   const [data, setData] = useState<PresentationData>(DEFAULT_DATA)
-  const [opacity, setOpacity] = useState(0)
-  const animRef = useRef<number | null>(null)
-  const opacityRef = useRef(0)
   const targetRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -211,6 +208,15 @@ export default function PresentationApp() {
   // Listen for updates from main process
   useEffect(() => {
     if (!window.electronAPI?.onPresentationUpdate) return
+
+    // Pull any data that was sent before this listener was ready
+    window.electronAPI.getPresentationData?.().then((cached: PresentationData | null) => {
+      if (cached) {
+        setData(cached)
+        targetRef.current = cached.visible ? 1 : 0
+      }
+    })
+
     const cleanup = window.electronAPI.onPresentationUpdate((incoming: PresentationData) => {
       setData(incoming)
       targetRef.current = incoming.visible ? 1 : 0
@@ -218,27 +224,6 @@ export default function PresentationApp() {
     return cleanup
   }, [])
 
-  // Animate opacity fade in/out
-  useEffect(() => {
-    const animate = () => {
-      const current = opacityRef.current
-      const target = targetRef.current
-      if (Math.abs(current - target) < 0.01) {
-        opacityRef.current = target
-        setOpacity(target)
-        animRef.current = requestAnimationFrame(animate)
-        return
-      }
-      const next = current + (target - current) * 0.08
-      opacityRef.current = next
-      setOpacity(next)
-      animRef.current = requestAnimationFrame(animate)
-    }
-    animRef.current = requestAnimationFrame(animate)
-    return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current)
-    }
-  }, [])
 
   const lines = data.text ? data.text.split('\n').filter(Boolean) : []
 
