@@ -383,19 +383,41 @@
 
 .main-preview {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #050508;
   position: relative;
+  background: #050508;
   overflow: hidden;
   min-height: 0;
 }
 
-.main-preview__canvas {
-  display: block;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+.main-preview__stage {
+  overflow: hidden;
+  border-radius: 6px;
+  box-shadow: 0 0 30px rgba(0,0,0,0.8);
+}
+
+.main-preview__no-camera {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #444;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.main-preview__no-camera-icon {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+
+.main-preview__no-camera-label {
+  font-size: 14px;
+}
+
+.main-preview__error-z {
+  z-index: 10;
 }
 
 .preview-error {

@@ -484,6 +484,8 @@ function App() {
             overlaySettings={overlaySettings}
             logoSettings={logoSettings}
             cameraError={cameras.cameraError}
+            cameraFallback={cameraFallback}
+            camView={cameras.camView}
           />
         </div>
 

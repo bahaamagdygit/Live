@@ -300,7 +300,7 @@ export default function PresentationApp() {
   )
 }
 
-function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, textColor, alignment,
+export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, textColor, alignment,
   line1Bold, line2Bold,
   logoBase64, logoPosition, logoSize, logoOpacity, logoVisible, logoAnimation }: {
   line1: string; line2: string; visible: boolean;
