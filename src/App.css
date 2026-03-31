@@ -559,6 +559,12 @@
 }
 .cam-settings__reset-all:hover { color: var(--accent, #e94560); border-color: var(--accent, #e94560); }
 .btn--active { color: var(--accent, #e94560) !important; }
+.btn--fallback-on {
+  color: #f5e27a !important;
+  background: rgba(197,160,60,0.18) !important;
+  border-color: #c9a84c !important;
+  box-shadow: 0 0 8px rgba(197,160,60,0.4);
+}
 
 .pptx-launcher__body {
   flex: 1;
@@ -1039,6 +1045,7 @@ kbd {
   transition: all var(--transition-fast);
   padding: 6px 14px;
   white-space: nowrap;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -1323,6 +1330,7 @@ kbd {
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.15s ease;
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 

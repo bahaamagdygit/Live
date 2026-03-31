@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { Camera } from '../types'
 import { CameraViewSettings, DEFAULT_CAM_VIEW } from '../hooks/useCameras'
 
@@ -11,6 +11,8 @@ interface CameraPanelProps {
   error: string | null
   camView: CameraViewSettings
   onCamViewChange: (patch: Partial<CameraViewSettings>) => void
+  manualFallback: boolean
+  onToggleManualFallback: () => void
 }
 
 function CameraPreview({ camera, isActive, onClick }: {
@@ -54,6 +56,7 @@ function CameraPreview({ camera, isActive, onClick }: {
 export function CameraPanel({
   cameras, activeCamera, onSelectCamera, onRefresh,
   isLoading, error, camView, onCamViewChange,
+  manualFallback, onToggleManualFallback,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
   const set = (patch: Partial<CameraViewSettings>) => onCamViewChange(patch)
@@ -67,6 +70,12 @@ export function CameraPanel({
           Cameras
         </h3>
         <div className="panel__header-actions">
+          <button
+            type="button"
+            className={`btn btn--icon ${manualFallback ? 'btn--fallback-on' : ''}`}
+            onClick={onToggleManualFallback}
+            title={manualFallback ? 'Fallback BG: ON — click to turn off' : 'Show fallback background'}
+          >🖼️</button>
           {activeCamera && (
             <button
               type="button"

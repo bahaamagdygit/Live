@@ -26,6 +26,7 @@ interface PresentationData {
   cameraFlipV?: boolean
   fallbackBase64?: string
   fallbackFit?: 'cover' | 'contain' | 'fill'
+  manualFallback?: boolean
   logoBase64?: string
   logoPosition?: 'top-right' | 'top-left' | 'top-center' | 'bottom-right' | 'bottom-left'
   logoSize?: number
@@ -248,11 +249,11 @@ export default function PresentationApp() {
       {/* Hidden canvas used for brightness frame analysis (Case 2) */}
       <canvas ref={canvasRef} className="presentation-canvas-hidden" />
 
-      {/* Fallback image — always in DOM, z-index covers video when cameraFailed */}
+      {/* Fallback image — shown when camera fails OR manually triggered */}
       {data.fallbackBase64 && (
         <img
           src={data.fallbackBase64}
-          className={`presentation-fallback${cameraFailed ? '' : ' presentation-fallback--hidden'}`}
+          className={`presentation-fallback${(cameraFailed || data.manualFallback) ? '' : ' presentation-fallback--hidden'}`}
           alt=""
         />
       )}

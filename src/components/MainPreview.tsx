@@ -9,6 +9,7 @@ interface MainPreviewProps {
   logoSettings: LogoSettings
   cameraError: string | null
   cameraFallback: CameraFallbackSettings
+  manualFallback?: boolean
   camView?: {
     scale: number
     offsetX: number
@@ -32,6 +33,7 @@ export function MainPreview({
   logoSettings,
   cameraError,
   cameraFallback,
+  manualFallback = false,
   camView,
 }: MainPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -97,11 +99,11 @@ export function MainPreview({
         {/* Black background */}
         <div className="presentation-bg" />
 
-        {/* Fallback image when no stream */}
-        {cameraFallback.base64 && !activeStream && (
+        {/* Fallback image — shown when no stream OR manually triggered */}
+        {cameraFallback.base64 && (
           <img
             src={cameraFallback.base64}
-            className="presentation-fallback"
+            className={`presentation-fallback${(!activeStream || manualFallback) ? '' : ' presentation-fallback--hidden'}`}
             style={{ objectFit: cameraFallback.fit }}
             alt=""
           />

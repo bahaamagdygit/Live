@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CameraPanel } from './components/CameraPanel'
 import { MainPreview } from './components/MainPreview'
 import { TextControls } from './components/TextControls'
@@ -7,7 +7,7 @@ import { SettingsModal } from './components/SettingsModal'
 import { useCameras } from './hooks/useCameras'
 import { useStream } from './hooks/useStream'
 import { useSlides } from './hooks/useSlides'
-import { AppSettings, OverlaySettings, LogoSettings, StreamConfig, CameraFallbackSettings } from './types'
+import { AppSettings, OverlaySettings, LogoSettings, CameraFallbackSettings } from './types'
 import './App.css'
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -63,6 +63,7 @@ function App() {
   )
   const [logoSettings, setLogoSettings] = useState<LogoSettings>(DEFAULT_SETTINGS.logoSettings)
   const [cameraFallback, setCameraFallback] = useState<CameraFallbackSettings>(DEFAULT_SETTINGS.cameraFallback)
+  const [manualFallback, setManualFallback] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [isPresentationOpen, setIsPresentationOpen] = useState(false)
@@ -227,8 +228,9 @@ function App() {
       logoAnimation: logoSettings.animation,
       fallbackBase64: cameraFallback.base64 || '',
       fallbackFit: cameraFallback.fit,
+      manualFallback,
     })
-  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback])
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback, manualFallback])
 
   // ── PPTX Controller window ──────────────────────────────────────────────────
 
@@ -335,6 +337,7 @@ function App() {
           logoAnimation: logoSettings.animation,
           fallbackBase64: cameraFallback.base64 || '',
           fallbackFit: cameraFallback.fit,
+          manualFallback,
         })
       }
     }
@@ -475,6 +478,8 @@ function App() {
             error={cameras.cameraError}
             camView={cameras.camView}
             onCamViewChange={patch => cameras.setCamView(patch)}
+            manualFallback={manualFallback}
+            onToggleManualFallback={() => setManualFallback(v => !v)}
           />
         </div>
 
@@ -486,6 +491,7 @@ function App() {
             logoSettings={logoSettings}
             cameraError={cameras.cameraError}
             cameraFallback={cameraFallback}
+            manualFallback={manualFallback}
             camView={cameras.camView}
           />
         </div>
