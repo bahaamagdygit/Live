@@ -113,95 +113,95 @@ export function CameraPanel({
           <div className="cam-settings">
             <div className="cam-settings__title">⚙️ {activeCamera.label}</div>
 
-            <div className="cam-settings__row">
-              <label className="cam-settings__label">Resolution</label>
-              <select title="Resolution" className="cam-settings__select"
-                value={camView.resolution}
-                onChange={e => set({ resolution: e.target.value as CameraViewSettings['resolution'] })}>
-                <option value="4k">4K (3840×2160)</option>
-                <option value="1080p">1080p (1920×1080)</option>
-                <option value="720p">720p (1280×720)</option>
-                <option value="480p">480p (854×480)</option>
-              </select>
+            {/* Selects — 2-col grid */}
+            <div className="cam-settings__selects-grid">
+              <div className="cam-settings__select-block">
+                <label className="cam-settings__label">Resolution</label>
+                <select title="Resolution" className="cam-settings__select"
+                  value={camView.resolution}
+                  onChange={e => set({ resolution: e.target.value as CameraViewSettings['resolution'] })}>
+                  <option value="4k">4K</option>
+                  <option value="1080p">1080p</option>
+                  <option value="720p">720p</option>
+                  <option value="480p">480p</option>
+                </select>
+              </div>
+              <div className="cam-settings__select-block">
+                <label className="cam-settings__label">Frame Rate</label>
+                <select title="Frame rate" className="cam-settings__select"
+                  value={camView.frameRate}
+                  onChange={e => set({ frameRate: Number(e.target.value) as 30 | 60 })}>
+                  <option value={30}>30 fps</option>
+                  <option value={60}>60 fps</option>
+                </select>
+              </div>
+              <div className="cam-settings__select-block cam-settings__select-block--full">
+                <label className="cam-settings__label">Fit</label>
+                <select title="Fit mode" className="cam-settings__select"
+                  value={camView.fit}
+                  onChange={e => set({ fit: e.target.value as CameraViewSettings['fit'] })}>
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                  <option value="fill">Stretch</option>
+                  <option value="none">Original</option>
+                </select>
+              </div>
             </div>
 
-            <div className="cam-settings__row">
-              <label className="cam-settings__label">Frame Rate</label>
-              <select title="Frame rate" className="cam-settings__select"
-                value={camView.frameRate}
-                onChange={e => set({ frameRate: Number(e.target.value) as 30 | 60 })}>
-                <option value={30}>30 fps</option>
-                <option value={60}>60 fps</option>
-              </select>
+            {/* Sliders */}
+            <div className="cam-settings__sliders">
+              <div className="cam-settings__slider-row">
+                <label className="cam-settings__label">Zoom {camView.scale}%</label>
+                <input type="range" title="Zoom" min={10} max={300} value={camView.scale}
+                  onChange={e => set({ scale: Number(e.target.value) })} />
+                <button type="button" className="cam-settings__rst" onClick={() => set({ scale: 100 })}>↺</button>
+              </div>
+              <div className="cam-settings__slider-row">
+                <label className="cam-settings__label">X {camView.offsetX > 0 ? '+' : ''}{camView.offsetX}%</label>
+                <input type="range" title="X offset" min={-100} max={100} value={camView.offsetX}
+                  onChange={e => set({ offsetX: Number(e.target.value) })} />
+                <button type="button" className="cam-settings__rst" onClick={() => set({ offsetX: 0 })}>↺</button>
+              </div>
+              <div className="cam-settings__slider-row">
+                <label className="cam-settings__label">Y {camView.offsetY > 0 ? '+' : ''}{camView.offsetY}%</label>
+                <input type="range" title="Y offset" min={-100} max={100} value={camView.offsetY}
+                  onChange={e => set({ offsetY: Number(e.target.value) })} />
+                <button type="button" className="cam-settings__rst" onClick={() => set({ offsetY: 0 })}>↺</button>
+              </div>
+              <div className="cam-settings__slider-row">
+                <label className="cam-settings__label">Bright {camView.brightness}%</label>
+                <input type="range" title="Brightness" min={0} max={200} value={camView.brightness}
+                  onChange={e => set({ brightness: Number(e.target.value) })} />
+                <button type="button" className="cam-settings__rst" onClick={() => set({ brightness: 100 })}>↺</button>
+              </div>
+              <div className="cam-settings__slider-row">
+                <label className="cam-settings__label">Contrast {camView.contrast}%</label>
+                <input type="range" title="Contrast" min={0} max={200} value={camView.contrast}
+                  onChange={e => set({ contrast: Number(e.target.value) })} />
+                <button type="button" className="cam-settings__rst" onClick={() => set({ contrast: 100 })}>↺</button>
+              </div>
+              <div className="cam-settings__slider-row">
+                <label className="cam-settings__label">Saturate {camView.saturation}%</label>
+                <input type="range" title="Saturation" min={0} max={200} value={camView.saturation}
+                  onChange={e => set({ saturation: Number(e.target.value) })} />
+                <button type="button" className="cam-settings__rst" onClick={() => set({ saturation: 100 })}>↺</button>
+              </div>
             </div>
 
-            <div className="cam-settings__row">
-              <label className="cam-settings__label">Fit</label>
-              <select title="Fit mode" className="cam-settings__select"
-                value={camView.fit}
-                onChange={e => set({ fit: e.target.value as CameraViewSettings['fit'] })}>
-                <option value="cover">Cover</option>
-                <option value="contain">Contain</option>
-                <option value="fill">Stretch</option>
-                <option value="none">Original</option>
-              </select>
-            </div>
-
-            <div className="cam-settings__slider-row">
-              <label className="cam-settings__label">Zoom {camView.scale}%</label>
-              <input type="range" title="Zoom" min={10} max={300} value={camView.scale}
-                onChange={e => set({ scale: Number(e.target.value) })} />
-              <button type="button" className="cam-settings__rst" onClick={() => set({ scale: 100 })}>↺</button>
-            </div>
-
-            <div className="cam-settings__slider-row">
-              <label className="cam-settings__label">X {camView.offsetX > 0 ? '+' : ''}{camView.offsetX}%</label>
-              <input type="range" title="X offset" min={-100} max={100} value={camView.offsetX}
-                onChange={e => set({ offsetX: Number(e.target.value) })} />
-              <button type="button" className="cam-settings__rst" onClick={() => set({ offsetX: 0 })}>↺</button>
-            </div>
-
-            <div className="cam-settings__slider-row">
-              <label className="cam-settings__label">Y {camView.offsetY > 0 ? '+' : ''}{camView.offsetY}%</label>
-              <input type="range" title="Y offset" min={-100} max={100} value={camView.offsetY}
-                onChange={e => set({ offsetY: Number(e.target.value) })} />
-              <button type="button" className="cam-settings__rst" onClick={() => set({ offsetY: 0 })}>↺</button>
-            </div>
-
-            <div className="cam-settings__slider-row">
-              <label className="cam-settings__label">Brightness {camView.brightness}%</label>
-              <input type="range" title="Brightness" min={0} max={200} value={camView.brightness}
-                onChange={e => set({ brightness: Number(e.target.value) })} />
-              <button type="button" className="cam-settings__rst" onClick={() => set({ brightness: 100 })}>↺</button>
-            </div>
-
-            <div className="cam-settings__slider-row">
-              <label className="cam-settings__label">Contrast {camView.contrast}%</label>
-              <input type="range" title="Contrast" min={0} max={200} value={camView.contrast}
-                onChange={e => set({ contrast: Number(e.target.value) })} />
-              <button type="button" className="cam-settings__rst" onClick={() => set({ contrast: 100 })}>↺</button>
-            </div>
-
-            <div className="cam-settings__slider-row">
-              <label className="cam-settings__label">Saturation {camView.saturation}%</label>
-              <input type="range" title="Saturation" min={0} max={200} value={camView.saturation}
-                onChange={e => set({ saturation: Number(e.target.value) })} />
-              <button type="button" className="cam-settings__rst" onClick={() => set({ saturation: 100 })}>↺</button>
-            </div>
-
+            {/* Flip buttons */}
             <div className="cam-settings__row">
               <label className="cam-settings__label">Flip</label>
               <div className="cam-settings__flip-btns">
                 <button type="button"
                   className={`cam-settings__flip ${camView.flipH ? 'cam-settings__flip--on' : ''}`}
-                  onClick={() => set({ flipH: !camView.flipH })}>↔ H</button>
+                  onClick={() => set({ flipH: !camView.flipH })}>↔ Horiz</button>
                 <button type="button"
                   className={`cam-settings__flip ${camView.flipV ? 'cam-settings__flip--on' : ''}`}
-                  onClick={() => set({ flipV: !camView.flipV })}>↕ V</button>
+                  onClick={() => set({ flipV: !camView.flipV })}>↕ Vert</button>
               </div>
             </div>
 
-            <button type="button" className="cam-settings__reset-all" onClick={reset}>Reset All</button>
+            <button type="button" className="cam-settings__reset-all" onClick={reset}>↺ Reset All</button>
           </div>
         )}
       </div>
