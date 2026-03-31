@@ -310,9 +310,18 @@ async function parsePptxSlides(filePath: string): Promise<any[]> {
 
   const slides = slideEntries.map((entry: any, idx: number) => {
     const xml = entry.getData().toString('utf8')
-    const textMatches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || []
-    const texts = textMatches
-      .map((t: string) => t.replace(/<[^>]+>/g, '').trim())
+
+    // Extract paragraphs (<a:p>), then join all runs (<a:t>) within each paragraph.
+    // This prevents a single sentence split across multiple runs from becoming multiple lines.
+    const paragraphMatches = xml.match(/<a:p[ >][\s\S]*?<\/a:p>/g) || []
+    const texts = paragraphMatches
+      .map((para: string) => {
+        const runMatches = para.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || []
+        return runMatches
+          .map((r: string) => r.replace(/<[^>]+>/g, ''))
+          .join('')
+          .trim()
+      })
       .filter((t: string) => t.length > 0)
 
     const slideNum = idx + 1

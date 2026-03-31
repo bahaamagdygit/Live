@@ -368,6 +368,7 @@
   text-shadow: 0 0 18px rgba(197,160,60,0.6), 0 2px 4px rgba(0,0,0,0.8);
   letter-spacing: 0.8px;
   width: 100%;
+  white-space: nowrap;
 }
 .church-reading-divider {
   display: flex; align-items: center; gap: 14px;
@@ -392,6 +393,7 @@
   line-height: 1.5; letter-spacing: 1.5px;
   text-shadow: 0 1px 6px rgba(0,0,0,0.7);
   width: 100%;
+  white-space: nowrap;
 }
 
 .presentation-counter {
