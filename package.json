@@ -10,6 +10,12 @@
     "electron:dev": "wait-on http://localhost:5173 && electron ."
   },
   "dependencies": {
+    "@fontsource/amiri": "^5.2.8",
+    "@fontsource/cairo": "^5.2.7",
+    "@fontsource/lalezar": "^5.2.7",
+    "@fontsource/noto-kufi-arabic": "^5.2.9",
+    "@fontsource/reem-kufi": "^5.2.11",
+    "@fontsource/tajawal": "^5.2.7",
     "adm-zip": "^0.5.16",
     "electron-store": "^8.1.0",
     "mammoth": "^1.12.0",
