@@ -136,6 +136,9 @@ export function MainPreview({
           alignment={overlaySettings.alignment}
           line1Bold={overlaySettings.line1Bold ?? true}
           line2Bold={overlaySettings.line2Bold ?? false}
+          line2FontSize={overlaySettings.line2FontSize}
+          line2FontFamily={overlaySettings.line2FontFamily}
+          line2TextColor={overlaySettings.line2TextColor}
           logoBase64={logoSettings.base64 || ''}
           logoPosition={logoSettings.position}
           logoSize={logoSettings.size}

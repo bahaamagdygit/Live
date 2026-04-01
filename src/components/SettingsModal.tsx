@@ -251,97 +251,137 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
             <div className="settings-section">
               <h3 className="settings-section__title">Text Overlay Settings</h3>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Font Family</label>
-                  <select
-                    className="form-select"
-                    value={localSettings.overlaySettings.fontFamily}
-                    onChange={(e) => updateOverlay({ fontFamily: e.target.value })}
-                  >
-                    {FONT_FAMILIES.map((f) => (
-                      <option key={f} value={f} style={{ fontFamily: f }}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Font Size (px)</label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    min={12}
-                    max={120}
-                    value={localSettings.overlaySettings.fontSize}
-                    onChange={(e) => updateOverlay({ fontSize: Number(e.target.value) })}
-                  />
+              {/* LINE 1 */}
+              <div className="settings-line-group">
+                <div className="settings-line-group__title">Line 1 (Header)</div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Font Family</label>
+                    <select
+                      className="form-select"
+                      value={localSettings.overlaySettings.fontFamily}
+                      onChange={(e) => updateOverlay({ fontFamily: e.target.value })}
+                    >
+                      {FONT_FAMILIES.map((f) => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Font Size (px)</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min={12}
+                      max={120}
+                      value={localSettings.overlaySettings.fontSize}
+                      onChange={(e) => updateOverlay({ fontSize: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Color</label>
+                    <div className="color-input-wrapper">
+                      <input
+                        type="color"
+                        className="form-color"
+                        value={localSettings.overlaySettings.textColor}
+                        onChange={(e) => updateOverlay({ textColor: e.target.value })}
+                      />
+                      <span className="color-value">{localSettings.overlaySettings.textColor}</span>
+                    </div>
+                  </div>
+                  <div className="form-group form-group--center">
+                    <label className="form-check">
+                      <input
+                        type="checkbox"
+                        checked={localSettings.overlaySettings.line1Bold ?? true}
+                        onChange={(e) => updateOverlay({ line1Bold: e.target.checked })}
+                      />
+                      <span className="text-bold">Bold</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Line 1 (Header)</label>
-                  <label className="form-check">
+              {/* LINE 2 */}
+              <div className="settings-line-group">
+                <div className="settings-line-group__title">Line 2 (Subtitle)</div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Font Family</label>
+                    <select
+                      className="form-select"
+                      value={localSettings.overlaySettings.line2FontFamily ?? localSettings.overlaySettings.fontFamily}
+                      onChange={(e) => updateOverlay({ line2FontFamily: e.target.value })}
+                    >
+                      {FONT_FAMILIES.map((f) => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Font Size (px)</label>
                     <input
-                      type="checkbox"
-                      checked={localSettings.overlaySettings.line1Bold ?? true}
-                      onChange={(e) => updateOverlay({ line1Bold: e.target.checked })}
+                      className="form-input"
+                      type="number"
+                      min={12}
+                      max={120}
+                      value={localSettings.overlaySettings.line2FontSize ?? 28}
+                      onChange={(e) => updateOverlay({ line2FontSize: Number(e.target.value) })}
                     />
-                    <span className="text-bold">Bold</span>
-                  </label>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Line 2 (Subtitle)</label>
-                  <label className="form-check">
-                    <input
-                      type="checkbox"
-                      checked={localSettings.overlaySettings.line2Bold ?? false}
-                      onChange={(e) => updateOverlay({ line2Bold: e.target.checked })}
-                    />
-                    <span className="text-bold">Bold</span>
-                  </label>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Color</label>
+                    <div className="color-input-wrapper">
+                      <input
+                        type="color"
+                        className="form-color"
+                        value={localSettings.overlaySettings.line2TextColor ?? localSettings.overlaySettings.textColor}
+                        onChange={(e) => updateOverlay({ line2TextColor: e.target.value })}
+                      />
+                      <span className="color-value">{localSettings.overlaySettings.line2TextColor ?? localSettings.overlaySettings.textColor}</span>
+                    </div>
+                  </div>
+                  <div className="form-group form-group--center">
+                    <label className="form-check">
+                      <input
+                        type="checkbox"
+                        checked={localSettings.overlaySettings.line2Bold ?? false}
+                        onChange={(e) => updateOverlay({ line2Bold: e.target.checked })}
+                      />
+                      <span className="text-bold">Bold</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Text Color</label>
-                  <div className="color-input-wrapper">
-                    <input
-                      type="color"
-                      className="form-color"
-                      value={localSettings.overlaySettings.textColor}
-                      onChange={(e) => updateOverlay({ textColor: e.target.value })}
-                    />
-                    <span className="color-value">{localSettings.overlaySettings.textColor}</span>
+              {/* BACKGROUND */}
+              <div className="settings-line-group">
+                <div className="settings-line-group__title">Background</div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Color</label>
+                    <div className="color-input-wrapper">
+                      <input
+                        type="color"
+                        className="form-color"
+                        value={localSettings.overlaySettings.bgColor}
+                        onChange={(e) => updateOverlay({ bgColor: e.target.value })}
+                      />
+                      <span className="color-value">{localSettings.overlaySettings.bgColor}</span>
+                    </div>
                   </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Background Color</label>
-                  <div className="color-input-wrapper">
+                  <div className="form-group">
+                    <label className="form-label">Opacity ({localSettings.overlaySettings.bgOpacity}%)</label>
                     <input
-                      type="color"
-                      className="form-color"
-                      value={localSettings.overlaySettings.bgColor}
-                      onChange={(e) => updateOverlay({ bgColor: e.target.value })}
+                      type="range"
+                      className="form-range"
+                      min={0}
+                      max={100}
+                      value={localSettings.overlaySettings.bgOpacity}
+                      onChange={(e) => updateOverlay({ bgOpacity: Number(e.target.value) })}
                     />
-                    <span className="color-value">{localSettings.overlaySettings.bgColor}</span>
                   </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Background Opacity ({localSettings.overlaySettings.bgOpacity}%)</label>
-                  <input
-                    type="range"
-                    className="form-range"
-                    min={0}
-                    max={100}
-                    value={localSettings.overlaySettings.bgOpacity}
-                    onChange={(e) => updateOverlay({ bgOpacity: Number(e.target.value) })}
-                  />
                 </div>
               </div>
 

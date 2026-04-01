@@ -31,6 +31,9 @@ const DEFAULT_SETTINGS: AppSettings = {
     line1Bold: true,
     line2Bold: false,
     panelLayout: 'full' as const,
+    line2FontSize: 28,
+    line2FontFamily: 'Arial',
+    line2TextColor: '#ffffff',
   },
   logoSettings: {
     filePath: '',

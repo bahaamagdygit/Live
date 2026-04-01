@@ -34,6 +34,9 @@ interface PresentationData {
   logoVisible?: boolean
   logoAnimation?: 'none' | 'rotate-right' | 'rotate-left' | 'flip-y' | 'flip-x' | 'pulse' | 'bounce'
   panelLayout?: 'full' | 'left' | 'right'
+  line2FontSize?: number
+  line2FontFamily?: string
+  line2TextColor?: string
 }
 
 const DEFAULT_DATA: PresentationData = {
@@ -286,6 +289,9 @@ export default function PresentationApp() {
         alignment={data.alignment}
         line1Bold={data.line1Bold ?? true}
         line2Bold={data.line2Bold ?? false}
+        line2FontSize={data.line2FontSize}
+        line2FontFamily={data.line2FontFamily}
+        line2TextColor={data.line2TextColor}
         logoBase64={data.logoBase64 || ''}
         logoPosition={data.logoPosition || 'top-right'}
         logoSize={data.logoSize ?? 180}
@@ -307,11 +313,13 @@ export default function PresentationApp() {
 
 export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, textColor, alignment,
   line1Bold, line2Bold,
+  line2FontSize, line2FontFamily, line2TextColor,
   logoBase64, logoPosition, logoSize, logoOpacity, logoVisible, logoAnimation,
   panelLayout = 'full' }: {
   line1: string; line2: string; visible: boolean;
   fontSize: number; fontFamily: string; textColor: string; alignment: string;
   line1Bold: boolean; line2Bold: boolean;
+  line2FontSize?: number; line2FontFamily?: string; line2TextColor?: string;
   logoBase64: string; logoPosition: string; logoSize: number; logoOpacity: number;
   logoVisible: boolean; logoAnimation: string;
   panelLayout?: 'full' | 'left' | 'right';
@@ -795,7 +803,13 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
             <div
               className="church-reading-line2"
               dir={isRtl(line2) ? 'rtl' : 'ltr'}
-              style={{ fontSize: `${Math.round(fontSize * 0.6)}px`, fontFamily, color: textColor, textAlign: alignment as any, fontWeight: line2Bold ? 'bold' : 'normal' }}
+              style={{
+                fontSize: `${line2FontSize ?? Math.round(fontSize * 0.6)}px`,
+                fontFamily: line2FontFamily ?? fontFamily,
+                color: line2TextColor ?? textColor,
+                textAlign: alignment as any,
+                fontWeight: line2Bold ? 'bold' : 'normal',
+              }}
             >{line2}</div>
           )}
         </div>

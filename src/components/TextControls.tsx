@@ -22,32 +22,41 @@ export function TextControls({
   currentSlideIndex,
   totalSlides,
 }: TextControlsProps) {
-  const [manualText, setManualText] = useState('')
+  const [line1, setLine1] = useState('')
+  const [line2, setLine2] = useState('')
   const [isManual, setIsManual] = useState(false)
 
-  // Sync with current slide text
+  // Sync with current slide text when not in manual mode
   useEffect(() => {
     if (!isManual) {
-      setManualText(currentSlideText)
+      const parts = currentSlideText.split('\n')
+      setLine1(parts[0] || '')
+      setLine2(parts[1] || '')
     }
   }, [currentSlideText, isManual])
 
-  // Update overlay text when manual text changes
-  useEffect(() => {
-    if (isManual) {
-      onTextChange(manualText)
-    }
-  }, [manualText, isManual])
-
-  const handleSlideTextUse = () => {
-    setIsManual(false)
-    onTextChange(currentSlideText)
-    setManualText(currentSlideText)
+  const emitChange = (l1: string, l2: string) => {
+    onTextChange([l1, l2].filter(Boolean).join('\n'))
   }
 
-  const handleManualEdit = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleLine1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     setIsManual(true)
-    setManualText(e.target.value)
+    setLine1(e.target.value)
+    emitChange(e.target.value, line2)
+  }
+
+  const handleLine2Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsManual(true)
+    setLine2(e.target.value)
+    emitChange(line1, e.target.value)
+  }
+
+  const handleSyncSlide = () => {
+    setIsManual(false)
+    const parts = currentSlideText.split('\n')
+    setLine1(parts[0] || '')
+    setLine2(parts[1] || '')
+    onTextChange(currentSlideText)
   }
 
   return (
@@ -55,6 +64,7 @@ export function TextControls({
       <div className="text-controls__left">
         <div className="text-controls__nav">
           <button
+            type="button"
             className="btn btn--icon btn--large"
             onClick={onPrevSlide}
             disabled={currentSlideIndex <= 0}
@@ -65,15 +75,14 @@ export function TextControls({
 
           <div className="text-controls__slide-info">
             {totalSlides > 0 ? (
-              <span>
-                {currentSlideIndex + 1} / {totalSlides}
-              </span>
+              <span>{currentSlideIndex + 1} / {totalSlides}</span>
             ) : (
               <span className="text-muted">No slides</span>
             )}
           </div>
 
           <button
+            type="button"
             className="btn btn--icon btn--large"
             onClick={onNextSlide}
             disabled={currentSlideIndex >= totalSlides - 1}
@@ -85,20 +94,29 @@ export function TextControls({
       </div>
 
       <div className="text-controls__center">
-        <div className="text-controls__textarea-wrapper">
-          <textarea
-            className={`text-controls__textarea ${isManual ? 'text-controls__textarea--manual' : ''}`}
-            value={manualText}
-            onChange={handleManualEdit}
-            placeholder="Slide text will appear here — or type custom text..."
-            rows={2}
-          />
+        <div className="text-controls__lines">
+          <div className="text-controls__line-row">
+            <span className="text-controls__line-label">Line 1</span>
+            <input
+              className={`text-controls__line-input${isManual ? ' text-controls__line-input--manual' : ''}`}
+              type="text"
+              value={line1}
+              onChange={handleLine1Change}
+              placeholder="First line..."
+            />
+          </div>
+          <div className="text-controls__line-row">
+            <span className="text-controls__line-label">Line 2</span>
+            <input
+              className={`text-controls__line-input${isManual ? ' text-controls__line-input--manual' : ''}`}
+              type="text"
+              value={line2}
+              onChange={handleLine2Change}
+              placeholder="Second line..."
+            />
+          </div>
           {isManual && (
-            <button
-              className="text-controls__sync-btn"
-              onClick={handleSlideTextUse}
-              title="Sync with current slide"
-            >
+            <button type="button" className="text-controls__sync-btn" onClick={handleSyncSlide}>
               ↩ Use Slide Text
             </button>
           )}
@@ -108,21 +126,13 @@ export function TextControls({
       <div className="text-controls__right">
         <div className="text-controls__visibility">
           <button
+            type="button"
             className={`btn btn--visibility ${overlaySettings.visible ? 'btn--hide' : 'btn--show'}`}
             onClick={onToggleText}
             title="Toggle text overlay (Space)"
           >
-            {overlaySettings.visible ? (
-              <>
-                <span className="btn-icon">👁️</span>
-                <span>Hide Text</span>
-              </>
-            ) : (
-              <>
-                <span className="btn-icon">👁️</span>
-                <span>Show Text</span>
-              </>
-            )}
+            <span className="btn-icon">👁️</span>
+            <span>{overlaySettings.visible ? 'Hide Text' : 'Show Text'}</span>
           </button>
           <div className="text-controls__hotkey-hint">
             Press <kbd>Space</kbd>
