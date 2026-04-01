@@ -108,7 +108,7 @@ function App() {
             cameraFallback: { ...DEFAULT_SETTINGS.cameraFallback, ...result.settings.cameraFallback },
             hotkeys: (() => {
               const saved: Record<string, string> = result.settings.hotkeys || {}
-              const oldDefaults = ['Space','Left','Right','F1','F2','F3','F4']
+              const oldDefaults = ['Space', 'Left', 'Right', 'F1', 'F2', 'F3', 'F4']
               const merged = { ...DEFAULT_SETTINGS.hotkeys }
               for (const k of Object.keys(merged) as (keyof typeof merged)[]) {
                 const v = saved[k] ?? ''
@@ -476,8 +476,8 @@ function App() {
               : '✝️'}
           </div>
           <div className="app-header__titles">
-            <h1 className="app-header__title">برنامج البث المباشر لكنيسة الشهيد العظيم مارمينا</h1>
-            <p className="app-header__subtitle">St. Mina the Great Martyr Church — Live Stream</p>
+            <h1 className="app-header__title">St. Mina the Great Martyr Church — Live Stream</h1>
+            <p className="app-header__subtitle">كنيسة الشهيد العظيم مارمينا — البث المباشر</p>
           </div>
         </div>
 
