@@ -99,14 +99,15 @@ export function MainPreview({
         {/* Black background */}
         <div className="presentation-bg" />
 
-        {/* Fallback image — shown when no stream OR manually triggered */}
-        {cameraFallback.base64 && (
-          <img
-            src={cameraFallback.base64}
-            className={`presentation-fallback${(!activeStream || manualFallback) ? '' : ' presentation-fallback--hidden'}`}
-            style={{ objectFit: cameraFallback.fit }}
-            alt=""
-          />
+        {/* Fallback — shown when no stream OR manually triggered */}
+        {(!activeStream || manualFallback) && (
+          cameraFallback.base64
+            ? <img
+                src={cameraFallback.base64}
+                className={`presentation-fallback presentation-fallback--fit-${cameraFallback.fit ?? 'cover'}`}
+                alt=""
+              />
+            : <div className="presentation-fallback presentation-fallback--default" />
         )}
 
         {/* Camera feed */}
@@ -144,13 +145,6 @@ export function MainPreview({
           panelLayout={overlaySettings.panelLayout ?? 'full'}
         />
 
-        {/* No camera placeholder */}
-        {!activeStream && !cameraFallback.base64 && (
-          <div className="main-preview__no-camera">
-            <div className="main-preview__no-camera-icon">📷</div>
-            <div className="main-preview__no-camera-label">No Camera</div>
-          </div>
-        )}
 
         {cameraError && (
           <div className="preview-error main-preview__error-z">

@@ -57,6 +57,14 @@
   pointer-events: none;
 }
 
+.presentation-fallback--default {
+  background: radial-gradient(ellipse at center, #1a1a2e 0%, #0d0d1a 60%, #000000 100%);
+}
+
+.presentation-fallback--fit-cover  { object-fit: cover; }
+.presentation-fallback--fit-contain { object-fit: contain; }
+.presentation-fallback--fit-fill   { object-fit: fill; }
+
 .presentation-canvas-hidden {
   display: none;
 }

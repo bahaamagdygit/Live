@@ -249,13 +249,15 @@ export default function PresentationApp() {
       {/* Hidden canvas used for brightness frame analysis (Case 2) */}
       <canvas ref={canvasRef} className="presentation-canvas-hidden" />
 
-      {/* Fallback image — shown when camera fails OR manually triggered */}
-      {data.fallbackBase64 && (
-        <img
-          src={data.fallbackBase64}
-          className={`presentation-fallback${(cameraFailed || data.manualFallback) ? '' : ' presentation-fallback--hidden'}`}
-          alt=""
-        />
+      {/* Fallback — shown when camera fails OR manually triggered */}
+      {(cameraFailed || data.manualFallback) && (
+        data.fallbackBase64
+          ? <img
+              src={data.fallbackBase64}
+              className={`presentation-fallback presentation-fallback--fit-${data.fallbackFit ?? 'cover'}`}
+              alt=""
+            />
+          : <div className="presentation-fallback presentation-fallback--default" />
       )}
 
       {/* Camera feed */}
