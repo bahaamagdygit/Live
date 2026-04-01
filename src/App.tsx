@@ -99,6 +99,7 @@ function App() {
             overlaySettings: {
               ...DEFAULT_SETTINGS.overlaySettings,
               ...result.settings.overlaySettings,
+              visible: false,
             },
             logoSettings: { ...DEFAULT_SETTINGS.logoSettings, ...result.settings.logoSettings },
             cameraFallback: { ...DEFAULT_SETTINGS.cameraFallback, ...result.settings.cameraFallback },
