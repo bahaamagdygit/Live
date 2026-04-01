@@ -60,7 +60,6 @@ export default function PresentationApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const onCameraError = (reason: string) => {
-    console.warn('[Camera]', reason)
     setCameraFailed(true)
   }
 

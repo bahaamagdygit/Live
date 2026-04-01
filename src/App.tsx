@@ -138,7 +138,6 @@ function App() {
           }
         }
       } catch (err) {
-        console.error('Failed to load settings:', err)
       } finally {
         setIsInitialized(true)
       }

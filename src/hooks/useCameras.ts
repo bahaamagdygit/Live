@@ -74,7 +74,6 @@ export function useCameras(): UseCamerasReturn {
             deviceId: d.deviceId || String(idx),
           }))
       } catch (err) {
-        console.warn('Browser camera enumeration failed:', err)
       }
 
       // Also try Electron API for system-level camera list
@@ -86,7 +85,6 @@ export function useCameras(): UseCamerasReturn {
             electronDevices = result.cameras
           }
         } catch (err) {
-          console.warn('Electron camera API failed:', err)
         }
       }
 
@@ -98,7 +96,6 @@ export function useCameras(): UseCamerasReturn {
 
       // Auto-select first camera if none selected (don't let stream errors block the list)
       if (merged.length > 0 && !activeCamera) {
-        selectCameraById(merged[0]).catch((e) => console.warn('Auto-select camera failed:', e))
       }
     } catch (err: any) {
       setCameraError(err.message || 'Failed to enumerate cameras')

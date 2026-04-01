@@ -23,13 +23,11 @@ async function loadModules() {
     const storeModule = await import('electron-store')
     Store = storeModule.default
   } catch (e) {
-    console.error('Failed to load electron-store:', e)
   }
   try {
     const parserModule = await import('officeparser')
     officeParser = parserModule.default || parserModule
   } catch (e) {
-    console.error('Failed to load officeparser:', e)
   }
   try {
     // In packaged app, modules are in app.asar.unpacked
@@ -39,7 +37,6 @@ async function loadModules() {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     pdfParse = require(path.join(unpackedBase, 'pdf-parse'))
   } catch (e) {
-    console.error('Failed to load pdf-parse:', e)
     // fallback to normal require (dev mode)
     try { pdfParse = require('pdf-parse') } catch {}
   }
@@ -50,7 +47,6 @@ async function loadModules() {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     mammoth = require(path.join(unpackedBase, 'mammoth'))
   } catch (e) {
-    console.error('Failed to load mammoth:', e)
     try { mammoth = require('mammoth') } catch {}
   }
 }
@@ -179,7 +175,6 @@ function registerHotkeys() {
         }
       })
     } catch (e) {
-      console.warn(`Failed to register hotkey ${key}:`, e)
     }
   }
 
@@ -259,7 +254,6 @@ ipcMain.handle('get-cameras', async () => {
 
     return { success: true, cameras }
   } catch (err: any) {
-    console.warn('PowerShell camera enumeration failed, returning empty list:', err.message)
     return { success: true, cameras: [] }
   }
 })
@@ -308,7 +302,6 @@ ipcMain.handle('open-pptx', async () => {
 
     return { success: true, slides, filePath, fileType: ext }
   } catch (err: any) {
-    console.error('File parse error:', err)
     return { success: false, error: err.message }
   }
 })
@@ -318,7 +311,6 @@ async function parsePptxSlides(filePath: string): Promise<any[]> {
 
   // ── Extract sections ────────────────────────────────────────────────────
   const sections = extractSections(zip)
-  console.log('[parsePptxSlides] sections:', JSON.stringify(sections))
 
   // ── Parse each slide ────────────────────────────────────────────────────
   const slideEntries = zip
@@ -361,7 +353,6 @@ async function parsePptxSlides(filePath: string): Promise<any[]> {
     }
   })
 
-  console.log('[parsePptxSlides] slides sections:', slides.map(s => s.section))
   return slides
 }
 
@@ -582,7 +573,6 @@ ipcMain.handle('start-stream', async (_event, config: any) => {
 
     ffmpegStreamProcess.stderr?.on('data', (data: Buffer) => {
       const msg = data.toString()
-      console.log('[FFmpeg Stream]', msg)
       if (mainWindow) {
         mainWindow.webContents.send('stream-status', {
           type: 'log',
@@ -592,7 +582,6 @@ ipcMain.handle('start-stream', async (_event, config: any) => {
     })
 
     ffmpegStreamProcess.on('error', (err) => {
-      console.error('FFmpeg stream error:', err)
       ffmpegStreamProcess = null
       if (mainWindow) {
         mainWindow.webContents.send('stream-status', {
@@ -603,7 +592,6 @@ ipcMain.handle('start-stream', async (_event, config: any) => {
     })
 
     ffmpegStreamProcess.on('exit', (code) => {
-      console.log('FFmpeg stream exited with code:', code)
       ffmpegStreamProcess = null
       streamStartTime = null
       if (streamTimer) {
@@ -698,16 +686,13 @@ ipcMain.handle('start-recording', async (_event, config: any) => {
     ffmpegRecordProcess = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
 
     ffmpegRecordProcess.stderr?.on('data', (data: Buffer) => {
-      console.log('[FFmpeg Record]', data.toString())
     })
 
     ffmpegRecordProcess.on('error', (err) => {
-      console.error('FFmpeg recording error:', err)
       ffmpegRecordProcess = null
     })
 
     ffmpegRecordProcess.on('exit', (code) => {
-      console.log('FFmpeg recording exited with code:', code)
       ffmpegRecordProcess = null
       if (mainWindow) {
         mainWindow.webContents.send('stream-status', {
@@ -961,8 +946,6 @@ ipcMain.handle('close-pptx-controller', async () => {
 // Main → Controller: push slides data after load
 ipcMain.handle('send-slides-to-controller', async (_event, data: any) => {
   lastSlidesData = data
-  console.log('[send-slides-to-controller] slides count:', data?.slides?.length)
-  console.log('[send-slides-to-controller] first 3 sections:', data?.slides?.slice(0,3).map((s:any) => s.section))
   if (pptxControllerWindow && !pptxControllerWindow.isDestroyed()) {
     pptxControllerWindow.webContents.send('slides-data', data)
     return { success: true }

@@ -54,7 +54,7 @@ export function MainPreview({
     if (videoRef.current) {
       if (activeStream) {
         videoRef.current.srcObject = activeStream
-        videoRef.current.play().catch(console.warn)
+        videoRef.current.play().catch(() => {})
       } else {
         videoRef.current.srcObject = null
       }
