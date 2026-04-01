@@ -470,10 +470,14 @@ function App() {
       {/* Header */}
       <header className="app-header">
         <div className="app-header__brand">
-          <div className="app-header__logo">✝️</div>
+          <div className="app-header__logo">
+            {logoSettings.base64
+              ? <img src={logoSettings.base64} alt="logo" className="app-header__logo-img" />
+              : '✝️'}
+          </div>
           <div className="app-header__titles">
-            <h1 className="app-header__title">Church Live Stream Studio</h1>
-            <p className="app-header__subtitle">استوديو البث المباشر للكنيسة</p>
+            <h1 className="app-header__title">برنامج البث المباشر لكنيسة الشهيد العظيم مارمينا</h1>
+            <p className="app-header__subtitle">St. Mina the Great Martyr Church — Live Stream</p>
           </div>
         </div>
 
@@ -502,6 +506,7 @@ function App() {
         </div>
 
         <div className="app-header__actions">
+          <div className="app-header__author">Made by Bahaa Magdy</div>
           <button
             type="button"
             className="btn btn--ghost btn--sm"

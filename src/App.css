@@ -56,6 +56,19 @@
 .app-header__logo {
   font-size: 28px;
   filter: drop-shadow(0 0 8px rgba(200, 16, 46, 0.5));
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.app-header__logo-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 4px;
 }
 
 .app-header__titles {
@@ -64,10 +77,11 @@
 }
 
 .app-header__title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--color-text-primary);
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
+  direction: rtl;
   line-height: 1.2;
 }
 
@@ -88,6 +102,16 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+}
+
+.app-header__author {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+  padding-right: var(--spacing-sm);
+  border-right: 1px solid var(--color-border);
+  margin-right: var(--spacing-xs);
 }
 
 /* Live indicator in header */
