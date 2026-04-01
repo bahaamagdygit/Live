@@ -63,6 +63,15 @@ export interface AppSettings {
     cam2: string
     cam3: string
     cam4: string
+    startStream: string
+    stopStream: string
+    startRecording: string
+    stopRecording: string
+    openPresentation: string
+    closePresentation: string
+    openController: string
+    toggleFallback: string
+    openFile: string
   }
 }
 

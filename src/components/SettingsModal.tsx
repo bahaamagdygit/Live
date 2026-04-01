@@ -594,34 +594,71 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
             <div className="settings-section">
               <h3 className="settings-section__title">Keyboard Shortcuts</h3>
               <p className="settings-section__desc">
-                These are global hotkeys that work even when the app is not focused.
+                Click a field and press any key combination to assign it. Leave empty to disable.
               </p>
 
               {[
-                { key: 'toggleText', label: 'Toggle Text Overlay', default: 'Space' },
-                { key: 'nextSlide', label: 'Next Slide', default: 'Right' },
-                { key: 'prevSlide', label: 'Previous Slide', default: 'Left' },
-                { key: 'cam1', label: 'Switch to Camera 1', default: 'F1' },
-                { key: 'cam2', label: 'Switch to Camera 2', default: 'F2' },
-                { key: 'cam3', label: 'Switch to Camera 3', default: 'F3' },
-                { key: 'cam4', label: 'Switch to Camera 4', default: 'F4' },
+                { key: 'toggleText',       label: 'Toggle Text Overlay' },
+                { key: 'nextSlide',        label: 'Next Slide' },
+                { key: 'prevSlide',        label: 'Previous Slide' },
+                { key: 'cam1',             label: 'Switch to Camera 1' },
+                { key: 'cam2',             label: 'Switch to Camera 2' },
+                { key: 'cam3',             label: 'Switch to Camera 3' },
+                { key: 'cam4',             label: 'Switch to Camera 4' },
+                { key: 'startStream',      label: 'Start Stream' },
+                { key: 'stopStream',       label: 'Stop Stream' },
+                { key: 'startRecording',   label: 'Start Recording' },
+                { key: 'stopRecording',    label: 'Stop Recording' },
+                { key: 'openPresentation', label: 'Open Presentation Screen' },
+                { key: 'closePresentation',label: 'Close Presentation Screen' },
+                { key: 'openController',   label: 'Open/Close Controller' },
+                { key: 'toggleFallback',   label: 'Toggle Camera Fallback' },
+                { key: 'openFile',         label: 'Open Presentation File' },
               ].map((item) => (
                 <div key={item.key} className="form-row form-row--hotkey">
                   <label className="form-label form-label--hotkey">{item.label}</label>
-                  <input
-                    className="form-input form-input--hotkey"
-                    type="text"
-                    value={(localSettings.hotkeys as any)[item.key] || item.default}
-                    onChange={(e) => updateHotkey(item.key, e.target.value)}
-                    placeholder={item.default}
-                  />
+                  <div className="hotkey-input-wrap">
+                    <input
+                      className="form-input form-input--hotkey"
+                      type="text"
+                      readOnly
+                      value={(localSettings.hotkeys as any)[item.key] || ''}
+                      placeholder="Not assigned"
+                      onKeyDown={(e) => {
+                        e.preventDefault()
+                        const parts: string[] = []
+                        if (e.ctrlKey) parts.push('Ctrl')
+                        if (e.altKey) parts.push('Alt')
+                        if (e.shiftKey) parts.push('Shift')
+                        const key = e.key
+                        if (!['Control','Alt','Shift','Meta'].includes(key)) {
+                          const keyName = key === ' ' ? 'Space'
+                            : key === 'ArrowLeft' ? 'Left'
+                            : key === 'ArrowRight' ? 'Right'
+                            : key === 'ArrowUp' ? 'Up'
+                            : key === 'ArrowDown' ? 'Down'
+                            : key.length === 1 ? key.toUpperCase()
+                            : key
+                          parts.push(keyName)
+                        }
+                        if (parts.length > 0) updateHotkey(item.key, parts.join('+'))
+                      }}
+                    />
+                    {(localSettings.hotkeys as any)[item.key] && (
+                      <button
+                        type="button"
+                        className="hotkey-clear-btn"
+                        onClick={() => updateHotkey(item.key, '')}
+                        title="Clear"
+                      >✕</button>
+                    )}
+                  </div>
                 </div>
               ))}
 
               <div className="settings-note">
-                <span>ℹ️</span> Use Electron key names: Space, Left, Right, F1-F12, Ctrl+Key, etc.
-                <br />
-                Restart the app after changing hotkeys.
+                <span>ℹ️</span> Global hotkeys work even when the app is not focused.
+                Changes take effect after saving and restarting the app.
               </div>
             </div>
           )}

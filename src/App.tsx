@@ -46,13 +46,22 @@ const DEFAULT_SETTINGS: AppSettings = {
     fit: 'cover',
   },
   hotkeys: {
-    toggleText: 'Space',
-    nextSlide: 'Right',
-    prevSlide: 'Left',
-    cam1: 'F1',
-    cam2: 'F2',
-    cam3: 'F3',
-    cam4: 'F4',
+    toggleText: '',
+    nextSlide: '',
+    prevSlide: '',
+    cam1: '',
+    cam2: '',
+    cam3: '',
+    cam4: '',
+    startStream: '',
+    stopStream: '',
+    startRecording: '',
+    stopRecording: '',
+    openPresentation: '',
+    closePresentation: '',
+    openController: '',
+    toggleFallback: '',
+    openFile: '',
   },
 }
 
@@ -150,6 +159,33 @@ function App() {
           break
         case 'cam-4':
           if (cameras.cameras[3]) cameras.selectCamera(cameras.cameras[3])
+          break
+        case 'start-stream':
+          handleStartStream()
+          break
+        case 'stop-stream':
+          stream.stopStream()
+          break
+        case 'start-recording':
+          handleStartRecording()
+          break
+        case 'stop-recording':
+          stream.stopRecording()
+          break
+        case 'open-presentation':
+          if (!isPresentationOpen) handleTogglePresentation()
+          break
+        case 'close-presentation':
+          if (isPresentationOpen) handleTogglePresentation()
+          break
+        case 'open-controller':
+          handleTogglePptxController()
+          break
+        case 'toggle-fallback':
+          setManualFallback((v) => !v)
+          break
+        case 'open-file':
+          slides.openPptx()
           break
       }
     })

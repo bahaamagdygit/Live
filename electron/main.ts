@@ -108,14 +108,27 @@ async function createWindow() {
           opacity: 80,
           visible: false,
         },
+        cameraFallback: {
+          filePath: '',
+          fit: 'cover',
+        },
         hotkeys: {
-          toggleText: 'Space',
-          nextSlide: 'Right',
-          prevSlide: 'Left',
-          cam1: 'F1',
-          cam2: 'F2',
-          cam3: 'F3',
-          cam4: 'F4',
+          toggleText: '',
+          nextSlide: '',
+          prevSlide: '',
+          cam1: '',
+          cam2: '',
+          cam3: '',
+          cam4: '',
+          startStream: '',
+          stopStream: '',
+          startRecording: '',
+          stopRecording: '',
+          openPresentation: '',
+          closePresentation: '',
+          openController: '',
+          toggleFallback: '',
+          openFile: '',
         },
       },
     })
@@ -158,8 +171,9 @@ function registerHotkeys() {
   const hotkeys = store.get('hotkeys') || {}
 
   const register = (key: string, action: string) => {
+    if (!key || !key.trim()) return
     try {
-      globalShortcut.register(key, () => {
+      globalShortcut.register(key.trim(), () => {
         if (mainWindow) {
           mainWindow.webContents.send('hotkey', action)
         }
@@ -169,14 +183,22 @@ function registerHotkeys() {
     }
   }
 
-  // Always register arrow keys and space as defaults
-  register(hotkeys.toggleText || 'Space', 'toggle-text')
-  register(hotkeys.nextSlide || 'Right', 'next-slide')
-  register(hotkeys.prevSlide || 'Left', 'prev-slide')
-  register(hotkeys.cam1 || 'F1', 'cam-1')
-  register(hotkeys.cam2 || 'F2', 'cam-2')
-  register(hotkeys.cam3 || 'F3', 'cam-3')
-  register(hotkeys.cam4 || 'F4', 'cam-4')
+  register(hotkeys.toggleText, 'toggle-text')
+  register(hotkeys.nextSlide, 'next-slide')
+  register(hotkeys.prevSlide, 'prev-slide')
+  register(hotkeys.cam1, 'cam-1')
+  register(hotkeys.cam2, 'cam-2')
+  register(hotkeys.cam3, 'cam-3')
+  register(hotkeys.cam4, 'cam-4')
+  register(hotkeys.startStream, 'start-stream')
+  register(hotkeys.stopStream, 'stop-stream')
+  register(hotkeys.startRecording, 'start-recording')
+  register(hotkeys.stopRecording, 'stop-recording')
+  register(hotkeys.openPresentation, 'open-presentation')
+  register(hotkeys.closePresentation, 'close-presentation')
+  register(hotkeys.openController, 'open-controller')
+  register(hotkeys.toggleFallback, 'toggle-fallback')
+  register(hotkeys.openFile, 'open-file')
 }
 
 function unregisterHotkeys() {
@@ -720,6 +742,7 @@ ipcMain.handle('get-settings', async () => {
       streamConfig: store.get('streamConfig'),
       overlaySettings: store.get('overlaySettings'),
       logoSettings: store.get('logoSettings'),
+      cameraFallback: store.get('cameraFallback'),
       hotkeys: store.get('hotkeys'),
     },
   }
