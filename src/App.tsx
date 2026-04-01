@@ -102,7 +102,16 @@ function App() {
             },
             logoSettings: { ...DEFAULT_SETTINGS.logoSettings, ...result.settings.logoSettings },
             cameraFallback: { ...DEFAULT_SETTINGS.cameraFallback, ...result.settings.cameraFallback },
-            hotkeys: { ...DEFAULT_SETTINGS.hotkeys, ...result.settings.hotkeys },
+            hotkeys: (() => {
+              const saved: Record<string, string> = result.settings.hotkeys || {}
+              const oldDefaults = ['Space','Left','Right','F1','F2','F3','F4']
+              const merged = { ...DEFAULT_SETTINGS.hotkeys }
+              for (const k of Object.keys(merged) as (keyof typeof merged)[]) {
+                const v = saved[k] ?? ''
+                merged[k] = oldDefaults.includes(v) ? '' : v
+              }
+              return merged
+            })(),
           }
           setSettings(loaded)
           setOverlaySettings(loaded.overlaySettings)
@@ -546,9 +555,9 @@ function App() {
                 <div className="pptx-launcher__loaded">
                   <div className="pptx-launcher__file-icon">
                     {slides.fileType === 'pdf' ? '📕' :
-                     slides.fileType === 'docx' || slides.fileType === 'doc' ? '📝' :
-                     slides.fileType === 'xlsx' || slides.fileType === 'xls' ? '📊' :
-                     '📊'}
+                      slides.fileType === 'docx' || slides.fileType === 'doc' ? '📝' :
+                        slides.fileType === 'xlsx' || slides.fileType === 'xls' ? '📊' :
+                          '📊'}
                   </div>
                   <div className="pptx-launcher__file-name" title={slides.pptxFileName}>
                     {slides.pptxFileName}
