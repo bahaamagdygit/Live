@@ -45,6 +45,11 @@
     "directories": {
       "output": "release"
     },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
     "asarUnpack": [
       "node_modules/pdf-parse/**",
       "node_modules/mammoth/**",
