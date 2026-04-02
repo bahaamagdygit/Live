@@ -728,6 +728,17 @@
   color: var(--color-text-primary);
 }
 
+.pptx-launcher__display-select {
+  width: 100%;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .pptx-launcher__btn--present {
   background: var(--color-bg-elevated);
   border-color: var(--color-border-light);

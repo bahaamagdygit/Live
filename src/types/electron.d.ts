@@ -30,7 +30,8 @@ interface ElectronAPI {
   onStreamStatus: (callback: (status: any) => void) => () => void
   onHotkey: (callback: (action: string) => void) => () => void
   // Presentation window
-  openPresentationWindow: () => Promise<{ success: boolean; alreadyOpen?: boolean; error?: string }>
+  getDisplays: () => Promise<{ id: number; label: string; bounds: { x: number; y: number; width: number; height: number } }[]>
+  openPresentationWindow: (displayId?: number) => Promise<{ success: boolean; alreadyOpen?: boolean; error?: string }>
   closePresentationWindow: () => Promise<{ success: boolean }>
   updatePresentation: (data: any) => Promise<{ success: boolean; error?: string }>
   getPresentationData: () => Promise<any>

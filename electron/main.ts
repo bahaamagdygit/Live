@@ -685,10 +685,9 @@ ipcMain.handle('start-recording', async (_event, config: any) => {
   try {
     ffmpegRecordProcess = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
 
-    ffmpegRecordProcess.stderr?.on('data', (data: Buffer) => {
-    })
+    ffmpegRecordProcess.stderr?.on('data', () => {})
 
-    ffmpegRecordProcess.on('error', (err) => {
+    ffmpegRecordProcess.on('error', () => {
       ffmpegRecordProcess = null
     })
 
@@ -801,15 +800,31 @@ ipcMain.handle('open-external', async (_event, url: string) => {
 
 // ── Presentation Window ──────────────────────────────────────────────────────
 
-ipcMain.handle('open-presentation-window', async () => {
+ipcMain.handle('get-displays', () => {
+  const { screen } = require('electron')
+  const primary = screen.getPrimaryDisplay()
+  return screen.getAllDisplays().map((d: any) => ({
+    id: d.id,
+    label: `Display ${d.id}${d.id === primary.id ? ' (Primary)' : ''}`,
+    bounds: d.bounds,
+  }))
+})
+
+ipcMain.handle('open-presentation-window', async (_event, displayId?: number) => {
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.focus()
     return { success: true, alreadyOpen: true }
   }
 
-  const displays = require('electron').screen.getAllDisplays()
-  const externalDisplay = displays.find((d: any) => d.id !== require('electron').screen.getPrimaryDisplay().id)
-  const targetDisplay = externalDisplay || displays[0]
+  const { screen } = require('electron')
+  const displays = screen.getAllDisplays()
+  const primary = screen.getPrimaryDisplay()
+
+  let targetDisplay = displayId != null
+    ? displays.find((d: any) => d.id === displayId) ?? displays[0]
+    : displays.find((d: any) => d.id !== primary.id) ?? displays[0]
+
+  const isExternal = targetDisplay.id !== primary.id
   const { x, y, width, height } = targetDisplay.bounds
 
   presentationWindow = new BrowserWindow({
@@ -818,8 +833,8 @@ ipcMain.handle('open-presentation-window', async () => {
     width,
     height,
     backgroundColor: '#000000',
-    fullscreen: !!externalDisplay,
-    frame: !externalDisplay,
+    fullscreen: isExternal,
+    frame: !isExternal,
     alwaysOnTop: false,
     title: 'Church Presentation',
     webPreferences: {

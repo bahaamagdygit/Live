@@ -80,6 +80,8 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [isPresentationOpen, setIsPresentationOpen] = useState(false)
   const [isPptxControllerOpen, setIsPptxControllerOpen] = useState(false)
+  const [displays, setDisplays] = useState<{ id: number; label: string }[]>([])
+  const [selectedDisplayId, setSelectedDisplayId] = useState<number | undefined>(undefined)
 
   const cameras = useCameras()
   const stream = useStream()
@@ -143,6 +145,15 @@ function App() {
       }
     }
     loadSettings()
+  }, [])
+
+  // Load available displays
+  useEffect(() => {
+    if (!window.electronAPI?.getDisplays) return
+    window.electronAPI.getDisplays().then((list) => {
+      setDisplays(list)
+      if (list.length > 0) setSelectedDisplayId(list[list.length - 1].id)
+    })
   }, [])
 
   // Hotkey handler
@@ -359,7 +370,7 @@ function App() {
       await window.electronAPI.closePresentationWindow()
       setIsPresentationOpen(false)
     } else {
-      const result = await window.electronAPI.openPresentationWindow()
+      const result = await window.electronAPI.openPresentationWindow(selectedDisplayId)
       if (result?.success) {
         setIsPresentationOpen(true)
         // Send current state immediately
@@ -389,7 +400,7 @@ function App() {
         })
       }
     }
-  }, [isPresentationOpen, overlaySettings, slides.currentSlideIndex, slides.slides.length])
+  }, [isPresentationOpen, overlaySettings, slides.currentSlideIndex, slides.slides.length, selectedDisplayId])
 
   const handleToggleText = useCallback(() => {
     setOverlaySettings((prev) => ({ ...prev, visible: !prev.visible }))
@@ -597,6 +608,19 @@ function App() {
               >
                 📂 Open File
               </button>
+
+              {!isPresentationOpen && displays.length > 1 && (
+                <select
+                  className="pptx-launcher__display-select"
+                  title="Select display"
+                  value={selectedDisplayId ?? ''}
+                  onChange={(e) => setSelectedDisplayId(Number(e.target.value))}
+                >
+                  {displays.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </select>
+              )}
 
               <button
                 type="button"

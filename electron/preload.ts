@@ -23,7 +23,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('hotkey', listener)
   },
   // Presentation window
-  openPresentationWindow: () => ipcRenderer.invoke('open-presentation-window'),
+  getDisplays: () => ipcRenderer.invoke('get-displays'),
+  openPresentationWindow: (displayId?: number) => ipcRenderer.invoke('open-presentation-window', displayId),
   closePresentationWindow: () => ipcRenderer.invoke('close-presentation-window'),
   updatePresentation: (data: any) => ipcRenderer.invoke('update-presentation', data),
   getPresentationData: () => ipcRenderer.invoke('get-presentation-data'),
