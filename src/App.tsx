@@ -32,6 +32,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     line2Bold: false,
     panelLayout: 'full' as const,
     panelWidth: 100,
+    panelHeight: 20,
     line2FontSize: 28,
     line2FontFamily: 'Arial',
     line2TextColor: '#ffffff',

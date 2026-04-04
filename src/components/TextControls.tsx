@@ -63,6 +63,7 @@ export function TextControls({
 
   const panelLayout = overlaySettings.panelLayout ?? 'full'
   const panelWidth = overlaySettings.panelWidth ?? 100
+  const panelHeight = overlaySettings.panelHeight ?? 20
 
   return (
     <div className="text-controls">
@@ -147,19 +148,36 @@ export function TextControls({
               ))}
             </div>
           </div>
-          <div className="text-controls__layout-row">
-            <span className="text-controls__layout-label">Width {panelWidth}%</span>
-            <input
-              type="range"
-              className="text-controls__width-slider"
-              min={20}
-              max={100}
-              step={1}
-              value={panelWidth}
-              onChange={e => onOverlayChange({ panelWidth: Number(e.target.value) })}
-              title={`Panel width: ${panelWidth}%`}
-            />
-          </div>
+          {panelLayout !== 'full' && (
+            <div className="text-controls__layout-row">
+              <span className="text-controls__layout-label">Width {panelWidth}%</span>
+              <input
+                type="range"
+                className="text-controls__width-slider"
+                min={20}
+                max={100}
+                step={1}
+                value={panelWidth}
+                onChange={e => onOverlayChange({ panelWidth: Number(e.target.value) })}
+                title={`Panel width: ${panelWidth}%`}
+              />
+            </div>
+          )}
+          {panelLayout === 'full' && (
+            <div className="text-controls__layout-row">
+              <span className="text-controls__layout-label">Height {panelHeight}%</span>
+              <input
+                type="range"
+                className="text-controls__width-slider"
+                min={5}
+                max={50}
+                step={1}
+                value={panelHeight}
+                onChange={e => onOverlayChange({ panelHeight: Number(e.target.value) })}
+                title={`Panel height: ${panelHeight}%`}
+              />
+            </div>
+          )}
         </div>
 
         <div className="text-controls__visibility">

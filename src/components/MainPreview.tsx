@@ -148,6 +148,7 @@ export function MainPreview({
           logoAnimation={logoSettings.animation || 'none'}
           panelLayout={overlaySettings.panelLayout ?? 'full'}
           panelWidth={overlaySettings.panelWidth ?? 100}
+          panelHeight={overlaySettings.panelHeight ?? 20}
         />
 
 
