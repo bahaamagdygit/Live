@@ -52,57 +52,12 @@ export function useCameras(): UseCamerasReturn {
   const streamRef = useRef<MediaStream | null>(null)
   const camViewRef = useRef<CameraViewSettings>(DEFAULT_CAM_VIEW)
   const activeCameraRef = useRef<Camera | null>(null)
+  const camViewMapRef = useRef<Record<string, CameraViewSettings>>({})
+  // Ref so refreshCameras can call selectCameraById without circular deps
+  const selectCameraByIdRef = useRef<(camera: Camera, overrideView?: CameraViewSettings) => Promise<void>>(async () => {})
 
-  const refreshCameras = useCallback(async () => {
-    setIsLoading(true)
-    setCameraError(null)
-
-    try {
-      // First, enumerate via browser MediaDevices API
-      let browserDevices: Camera[] = []
-      try {
-        // Request permission first
-        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
-        tempStream.getTracks().forEach((t) => t.stop())
-
-        const devices = await navigator.mediaDevices.enumerateDevices()
-        browserDevices = devices
-          .filter((d) => d.kind === 'videoinput')
-          .map((d, idx) => ({
-            id: d.deviceId || String(idx),
-            label: d.label || `Camera ${idx + 1}`,
-            deviceId: d.deviceId || String(idx),
-          }))
-      } catch (err) {
-      }
-
-      // Also try Electron API for system-level camera list
-      let electronDevices: Camera[] = []
-      if (window.electronAPI) {
-        try {
-          const result = await window.electronAPI.getCameras()
-          if (result?.success && result.cameras?.length > 0) {
-            electronDevices = result.cameras
-          }
-        } catch (err) {
-        }
-      }
-
-      // Merge: prefer browser devices (they have proper deviceIds for getUserMedia)
-      const merged =
-        browserDevices.length > 0 ? browserDevices : electronDevices
-
-      setCameras(merged)
-
-      // Auto-select first camera if none selected (don't let stream errors block the list)
-      if (merged.length > 0 && !activeCamera) {
-      }
-    } catch (err: any) {
-      setCameraError(err.message || 'Failed to enumerate cameras')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [activeCamera])
+  // Keep camViewMapRef in sync
+  useEffect(() => { camViewMapRef.current = camViewMap }, [camViewMap])
 
   const stopCurrentStream = useCallback(() => {
     if (streamRef.current) {
@@ -145,6 +100,7 @@ export function useCameras(): UseCamerasReturn {
           streamRef.current = stream
           setActiveCameraStream(stream)
           setActiveCamera(camera)
+          activeCameraRef.current = camera
           return
         } catch (err: any) {
           lastErr = err
@@ -157,6 +113,64 @@ export function useCameras(): UseCamerasReturn {
     },
     [stopCurrentStream]
   )
+
+  // Keep ref in sync so refreshCameras can call it
+  useEffect(() => { selectCameraByIdRef.current = selectCameraById }, [selectCameraById])
+
+  const refreshCameras = useCallback(async () => {
+    setIsLoading(true)
+    setCameraError(null)
+
+    try {
+      // First, enumerate via browser MediaDevices API
+      let browserDevices: Camera[] = []
+      try {
+        // Request permission first
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
+        tempStream.getTracks().forEach((t) => t.stop())
+
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        browserDevices = devices
+          .filter((d) => d.kind === 'videoinput')
+          .map((d, idx) => ({
+            id: d.deviceId || String(idx),
+            label: d.label || `Camera ${idx + 1}`,
+            deviceId: d.deviceId || String(idx),
+          }))
+      } catch (err) {
+      }
+
+      // Also try Electron API for system-level camera list
+      let electronDevices: Camera[] = []
+      if (window.electronAPI) {
+        try {
+          const result = await window.electronAPI.getCameras()
+          if (result?.success && result.cameras?.length > 0) {
+            electronDevices = result.cameras
+          }
+        } catch (err) {
+        }
+      }
+
+      // Merge: prefer browser devices (they have proper deviceIds for getUserMedia)
+      const merged =
+        browserDevices.length > 0 ? browserDevices : electronDevices
+
+      setCameras(merged)
+
+      // Auto-select first camera if none selected
+      if (merged.length > 0 && !activeCameraRef.current) {
+        const first = merged[0]
+        const savedView = camViewMapRef.current[first.deviceId] ?? DEFAULT_CAM_VIEW
+        camViewRef.current = savedView
+        selectCameraByIdRef.current(first, savedView)
+      }
+    } catch (err: any) {
+      setCameraError(err.message || 'Failed to enumerate cameras')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   // Current active camera's view (falls back to defaults)
   const camView: CameraViewSettings = activeCamera
@@ -221,4 +235,3 @@ export function useCameras(): UseCamerasReturn {
     setCamView,
   }
 }
-

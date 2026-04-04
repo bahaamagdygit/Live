@@ -262,7 +262,7 @@ export default function PresentationApp() {
           : <div className="presentation-fallback presentation-fallback--default" />
       )}
 
-      {/* Camera feed */}
+      {/* Camera feed — hidden when manual fallback is active or camera failed */}
       <video
         ref={videoRef}
         className="presentation-camera"
@@ -274,6 +274,7 @@ export default function PresentationApp() {
           transform: `scale(${(data.cameraScale ?? 100) / 100}) translate(${data.cameraX ?? 0}%, ${data.cameraY ?? 0}%) scaleX(${data.cameraFlipH ? -1 : 1}) scaleY(${data.cameraFlipV ? -1 : 1})`,
           transformOrigin: 'center center',
           filter: `brightness(${data.cameraBrightness ?? 100}%) contrast(${data.cameraContrast ?? 100}%) saturate(${data.cameraSaturation ?? 100}%)`,
+          display: (!cameraFailed && !data.manualFallback) ? 'block' : 'none',
         }}
       />
 

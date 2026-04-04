@@ -110,7 +110,7 @@ export function MainPreview({
             : <div className="presentation-fallback presentation-fallback--default" />
         )}
 
-        {/* Camera feed */}
+        {/* Camera feed — only visible when stream is active and not in manual fallback */}
         <video
           ref={videoRef}
           className="presentation-camera"
@@ -122,6 +122,7 @@ export function MainPreview({
             transform: `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
             transformOrigin: 'center center',
             filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
+            display: activeStream && !manualFallback ? 'block' : 'none',
           }}
         />
 
