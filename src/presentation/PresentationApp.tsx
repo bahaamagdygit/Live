@@ -745,6 +745,7 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
       {/* ── Reading panel — bottom ── */}
       <div
         className={`church-reading-wrap church-reading-wrap--${panelLayout}`}
+        hidden={!visible}
         style={(() => {
           const w = panelWidth ?? 100
           const h = panelHeight ?? 20
