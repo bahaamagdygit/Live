@@ -32,6 +32,7 @@ export interface OverlaySettings {
   line1Bold: boolean
   line2Bold: boolean
   panelLayout: 'full' | 'left' | 'right'
+  panelWidth: number   // 20–100 % of screen width
   line2FontSize: number
   line2FontFamily: string
   line2TextColor: string

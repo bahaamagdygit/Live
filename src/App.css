@@ -1025,6 +1025,56 @@
 
 .text-controls__right {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Panel layout controls ── */
+.text-controls__layout {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.text-controls__layout-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.text-controls__layout-label {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  white-space: nowrap;
+  min-width: 56px;
+}
+.text-controls__layout-btns {
+  display: flex;
+  gap: 3px;
+}
+.text-controls__layout-btn {
+  background: var(--surface-2, #1e1e2e);
+  border: 1px solid var(--border, #333);
+  color: var(--text-muted, #aaa);
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.text-controls__layout-btn:hover {
+  background: var(--surface-3, #2a2a3e);
+  color: #fff;
+}
+.text-controls__layout-btn--active {
+  background: var(--accent, #4a6cf7);
+  border-color: var(--accent, #4a6cf7);
+  color: #fff;
+}
+.text-controls__width-slider {
+  width: 90px;
+  accent-color: var(--accent, #4a6cf7);
+  cursor: pointer;
 }
 
 .text-controls__visibility {

@@ -34,6 +34,7 @@ interface PresentationData {
   logoVisible?: boolean
   logoAnimation?: 'none' | 'rotate-right' | 'rotate-left' | 'flip-y' | 'flip-x' | 'pulse' | 'bounce'
   panelLayout?: 'full' | 'left' | 'right'
+  panelWidth?: number
   line2FontSize?: number
   line2FontFamily?: string
   line2TextColor?: string
@@ -299,6 +300,7 @@ export default function PresentationApp() {
         logoVisible={data.logoVisible ?? true}
         logoAnimation={data.logoAnimation || 'none'}
         panelLayout={data.panelLayout || 'full'}
+        panelWidth={data.panelWidth ?? 100}
       />
 
       {/* Slide counter (bottom right) */}
@@ -315,7 +317,7 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
   line1Bold, line2Bold,
   line2FontSize, line2FontFamily, line2TextColor,
   logoBase64, logoPosition, logoSize, logoOpacity, logoVisible, logoAnimation,
-  panelLayout = 'full' }: {
+  panelLayout = 'full', panelWidth = 100 }: {
   line1: string; line2: string; visible: boolean;
   fontSize: number; fontFamily: string; textColor: string; alignment: string;
   line1Bold: boolean; line2Bold: boolean;
@@ -323,6 +325,7 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
   logoBase64: string; logoPosition: string; logoSize: number; logoOpacity: number;
   logoVisible: boolean; logoAnimation: string;
   panelLayout?: 'full' | 'left' | 'right';
+  panelWidth?: number;
 }) {
   const particlesRef = useRef<HTMLDivElement>(null)
 
@@ -737,7 +740,23 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
       )}
 
       {/* ── Reading panel — bottom ── */}
-      <div className={`church-reading-wrap church-reading-wrap--${panelLayout}`}>
+      <div
+        className={`church-reading-wrap church-reading-wrap--${panelLayout}`}
+        style={(() => {
+          const w = panelWidth ?? 100
+          // Full: spans left/right inset of 55px each — override to percentage-based width
+          if (panelLayout === 'full') {
+            const pxWidth = Math.round(1920 * w / 100)
+            const left = Math.round((1920 - pxWidth) / 2)
+            return { left: `${left}px`, right: `${1920 - left - pxWidth}px`, width: 'auto' }
+          }
+          // Left/Right: CSS uses fixed 660px; override with percentage
+          const pxWidth = Math.round(1920 * w / 100)
+          if (panelLayout === 'left') return { width: `${pxWidth}px` }
+          if (panelLayout === 'right') return { width: `${pxWidth}px` }
+          return {}
+        })()}
+      >
         <div className="church-reading-topbar" />
         <div className="church-reading-midbar" />
         <div className="church-reading-panel">

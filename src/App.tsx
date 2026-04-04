@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     line1Bold: true,
     line2Bold: false,
     panelLayout: 'full' as const,
+    panelWidth: 100,
     line2FontSize: 28,
     line2FontFamily: 'Arial',
     line2TextColor: '#ffffff',
@@ -645,6 +646,7 @@ function App() {
         onPrevSlide={slides.prevSlide}
         currentSlideIndex={slides.currentSlideIndex}
         totalSlides={slides.slides.length}
+        onOverlayChange={(patch) => setOverlaySettings(prev => ({ ...prev, ...patch }))}
       />
 
       {/* Stream Controls Footer */}

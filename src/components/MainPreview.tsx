@@ -147,6 +147,7 @@ export function MainPreview({
           logoVisible={logoSettings.visible}
           logoAnimation={logoSettings.animation || 'none'}
           panelLayout={overlaySettings.panelLayout ?? 'full'}
+          panelWidth={overlaySettings.panelWidth ?? 100}
         />
 
 

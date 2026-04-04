@@ -10,6 +10,7 @@ interface TextControlsProps {
   onPrevSlide: () => void
   currentSlideIndex: number
   totalSlides: number
+  onOverlayChange: (patch: Partial<OverlaySettings>) => void
 }
 
 export function TextControls({
@@ -21,6 +22,7 @@ export function TextControls({
   onPrevSlide,
   currentSlideIndex,
   totalSlides,
+  onOverlayChange,
 }: TextControlsProps) {
   const [line1, setLine1] = useState('')
   const [line2, setLine2] = useState('')
@@ -58,6 +60,9 @@ export function TextControls({
     setLine2(parts[1] || '')
     onTextChange(currentSlideText)
   }
+
+  const panelLayout = overlaySettings.panelLayout ?? 'full'
+  const panelWidth = overlaySettings.panelWidth ?? 100
 
   return (
     <div className="text-controls">
@@ -124,6 +129,39 @@ export function TextControls({
       </div>
 
       <div className="text-controls__right">
+        {/* Panel layout + width controls */}
+        <div className="text-controls__layout">
+          <div className="text-controls__layout-row">
+            <span className="text-controls__layout-label">Panel</span>
+            <div className="text-controls__layout-btns">
+              {(['full', 'left', 'right'] as const).map(layout => (
+                <button
+                  key={layout}
+                  type="button"
+                  className={`text-controls__layout-btn${panelLayout === layout ? ' text-controls__layout-btn--active' : ''}`}
+                  onClick={() => onOverlayChange({ panelLayout: layout, panelWidth: layout === 'full' ? 100 : 40 })}
+                  title={layout === 'full' ? 'Full Width' : layout === 'left' ? 'Left Half' : 'Right Half'}
+                >
+                  {layout === 'full' ? '▬' : layout === 'left' ? '▌' : '▐'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="text-controls__layout-row">
+            <span className="text-controls__layout-label">Width {panelWidth}%</span>
+            <input
+              type="range"
+              className="text-controls__width-slider"
+              min={20}
+              max={100}
+              step={1}
+              value={panelWidth}
+              onChange={e => onOverlayChange({ panelWidth: Number(e.target.value) })}
+              title={`Panel width: ${panelWidth}%`}
+            />
+          </div>
+        </div>
+
         <div className="text-controls__visibility">
           <button
             type="button"
