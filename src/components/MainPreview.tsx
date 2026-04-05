@@ -4,10 +4,9 @@ import { ChurchBorderOverlay } from '../presentation/PresentationApp'
 import '../presentation/presentation.css'
 
 interface MainPreviewProps {
-  activeStream: MediaStream | null
+  cameraDeviceId: string
   overlaySettings: OverlaySettings
   logoSettings: LogoSettings
-  cameraError: string | null
   cameraFallback: CameraFallbackSettings
   manualFallback?: boolean
   camView?: {
@@ -28,18 +27,21 @@ const PRESENT_W = 1920
 const PRESENT_H = 1080
 
 export function MainPreview({
-  activeStream,
+  cameraDeviceId,
   overlaySettings,
   logoSettings,
-  cameraError,
   cameraFallback,
   manualFallback = false,
   camView,
 }: MainPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const [previewSize, setPreviewSize] = useState({ w: 960, h: 540 })
+  const [cameraFailed, setCameraFailed] = useState(false)
 
+  // Observe container size for scaling
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -50,16 +52,130 @@ export function MainPreview({
     return () => ro.disconnect()
   }, [])
 
+  // Camera stream management — mirrors PresentationApp logic
   useEffect(() => {
-    if (videoRef.current) {
-      if (activeStream) {
-        videoRef.current.srcObject = activeStream
-        videoRef.current.play().catch(() => {})
-      } else {
-        videoRef.current.srcObject = null
+    const deviceId = cameraDeviceId
+    if (!deviceId) {
+      setCameraFailed(true)
+      return
+    }
+
+    let stopped = false
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let brightnessInterval: ReturnType<typeof setInterval> | null = null
+
+    const stopBrightnessCheck = () => {
+      if (brightnessInterval) { clearInterval(brightnessInterval); brightnessInterval = null }
+    }
+
+    const stopStream = () => {
+      stopBrightnessCheck()
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+      if (videoRef.current) videoRef.current.srcObject = null
+    }
+
+    const captureFrame = (): Uint8ClampedArray | null => {
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) return null
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+      canvas.width = 32
+      canvas.height = 18
+      try {
+        ctx.drawImage(video, 0, 0, 32, 18)
+        return ctx.getImageData(0, 0, 32, 18).data
+      } catch { return null }
+    }
+
+    const framesAreSame = (a: Uint8ClampedArray, b: Uint8ClampedArray): boolean => {
+      let diff = 0
+      for (let i = 0; i < a.length; i += 8) diff += Math.abs(a[i] - b[i])
+      return diff < 20
+    }
+
+    const startBrightnessCheck = () => {
+      stopBrightnessCheck()
+      brightnessInterval = setInterval(() => {
+        const frame1 = captureFrame()
+        if (!frame1) return
+        setTimeout(() => {
+          if (!brightnessInterval) return
+          const frame2 = captureFrame()
+          if (!frame2) return
+          if (framesAreSame(frame1, frame2)) {
+            setCameraFailed(true)
+          } else {
+            setCameraFailed(false)
+          }
+        }, 600)
+      }, 2000)
+    }
+
+    const startStream = async () => {
+      if (stopped) return
+      stopStream()
+      setCameraFailed(false)
+
+      const base: MediaTrackConstraints = deviceId.length > 5
+        ? { deviceId: { ideal: deviceId } } : {}
+
+      const attempts: MediaStreamConstraints[] = [
+        { video: { ...base, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+        { video: { ...base }, audio: false },
+        { video: true, audio: false },
+      ]
+
+      let stream: MediaStream | null = null
+      for (const constraints of attempts) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints)
+          break
+        } catch { /* try next */ }
+      }
+
+      if (stopped) { stream?.getTracks().forEach(t => t.stop()); return }
+
+      if (!stream) {
+        setCameraFailed(true)
+        retryTimer = setTimeout(() => { if (!stopped) startStream() }, 4000)
+        return
+      }
+
+      streamRef.current = stream
+      if (videoRef.current) videoRef.current.srcObject = stream
+
+      const track = stream.getVideoTracks()[0]
+      if (track) {
+        track.addEventListener('ended', () => {
+          if (!stopped) {
+            setCameraFailed(true)
+            retryTimer = setTimeout(() => { if (!stopped) startStream() }, 4000)
+          }
+        })
+      }
+
+      const video = videoRef.current
+      if (video) {
+        const onPlaying = () => {
+          video.removeEventListener('playing', onPlaying)
+          startBrightnessCheck()
+        }
+        video.addEventListener('playing', onPlaying)
       }
     }
-  }, [activeStream])
+
+    startStream()
+
+    return () => {
+      stopped = true
+      if (retryTimer) clearTimeout(retryTimer)
+      stopStream()
+    }
+  }, [cameraDeviceId])
 
   const lines = overlaySettings.text ? overlaySettings.text.split('\n').filter(Boolean) : []
 
@@ -73,7 +189,6 @@ export function MainPreview({
   const saturation = camView?.saturation ?? 100
   const fit = camView?.fit ?? 'cover'
 
-  // Scale factor to fit 1920×1080 into preview container (letterbox)
   const scaleX = previewSize.w / PRESENT_W
   const scaleY = previewSize.h / PRESENT_H
   const scaleFactor = Math.min(scaleX, scaleY)
@@ -81,8 +196,12 @@ export function MainPreview({
   const stageLeft = (previewSize.w - PRESENT_W * scaleFactor) / 2
   const stageTop = (previewSize.h - PRESENT_H * scaleFactor) / 2
 
+  const showFallback = cameraFailed || manualFallback
+
   return (
     <div className="main-preview" ref={containerRef}>
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+
       {/* Fixed 1920×1080 inner stage, scaled down to fit preview */}
       <div
         className="main-preview__stage"
@@ -99,8 +218,8 @@ export function MainPreview({
         {/* Black background */}
         <div className="presentation-bg" />
 
-        {/* Fallback — shown when no stream OR manually triggered */}
-        {(!activeStream || manualFallback) && (
+        {/* Fallback — shown when camera fails OR manually triggered */}
+        {showFallback && (
           cameraFallback.base64
             ? <img
                 src={cameraFallback.base64}
@@ -110,7 +229,7 @@ export function MainPreview({
             : <div className="presentation-fallback presentation-fallback--default" />
         )}
 
-        {/* Camera feed — only visible when stream is active and not in manual fallback */}
+        {/* Camera feed */}
         <video
           ref={videoRef}
           className="presentation-camera"
@@ -122,11 +241,11 @@ export function MainPreview({
             transform: `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
             transformOrigin: 'center center',
             filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
-            display: activeStream && !manualFallback ? 'block' : 'none',
+            display: !showFallback ? 'block' : 'none',
           }}
         />
 
-        {/* Church border + reading panel — exact 1920×1080 layout */}
+        {/* Church border + reading panel */}
         <ChurchBorderOverlay
           line1={lines[0] || ''}
           line2={lines[1] || ''}
@@ -150,14 +269,6 @@ export function MainPreview({
           panelWidth={overlaySettings.panelWidth ?? 100}
           panelHeight={overlaySettings.panelHeight ?? 20}
         />
-
-
-        {cameraError && (
-          <div className="preview-error main-preview__error-z">
-            <div className="preview-error__icon">⚠️</div>
-            <div className="preview-error__message">{cameraError}</div>
-          </div>
-        )}
       </div>
     </div>
   )

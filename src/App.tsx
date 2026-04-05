@@ -552,10 +552,9 @@ function App() {
         {/* Center: Main Preview */}
         <div className="app-main__center">
           <MainPreview
-            activeStream={cameras.activeCameraStream}
+            cameraDeviceId={cameras.activeCamera?.deviceId || ''}
             overlaySettings={overlaySettings}
             logoSettings={logoSettings}
-            cameraError={cameras.cameraError}
             cameraFallback={cameraFallback}
             manualFallback={manualFallback}
             camView={cameras.camView}
