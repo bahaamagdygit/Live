@@ -5,6 +5,7 @@ import { CameraViewSettings, DEFAULT_CAM_VIEW } from '../hooks/useCameras'
 interface CameraPanelProps {
   cameras: Camera[]
   activeCamera: Camera | null
+  activeCameraStream: MediaStream | null
   onSelectCamera: (camera: Camera) => void
   onRefresh: () => void
   onRemoveCamera: (deviceId: string) => void
@@ -17,10 +18,11 @@ interface CameraPanelProps {
   disconnectedIds: Set<string>
 }
 
-function CameraPreview({ camera, isActive, isDisconnected, onClick, onRemove }: {
+function CameraPreview({ camera, isActive, isDisconnected, activeStream, onClick, onRemove }: {
   camera: Camera
   isActive: boolean
   isDisconnected: boolean
+  activeStream: MediaStream | null
   onClick: () => void
   onRemove: (e: React.MouseEvent) => void
 }) {
@@ -32,11 +34,20 @@ function CameraPreview({ camera, isActive, isDisconnected, onClick, onRemove }: 
       setPreviewError(true)
       return
     }
+
+    // Active camera: reuse the existing stream — don't open a competing one
+    if (isActive && activeStream) {
+      if (videoRef.current) videoRef.current.srcObject = activeStream
+      setPreviewError(false)
+      return
+    }
+
+    // Non-active camera: open a small thumbnail stream
     let stream: MediaStream | null = null
     const start = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: camera.deviceId ? { deviceId: { ideal: camera.deviceId }, width: 160, height: 90 } : { width: 160, height: 90 },
+          video: camera.deviceId ? { deviceId: { ideal: camera.deviceId }, width: 320, height: 180 } : { width: 320, height: 180 },
           audio: false,
         })
         if (videoRef.current) videoRef.current.srcObject = stream
@@ -45,7 +56,7 @@ function CameraPreview({ camera, isActive, isDisconnected, onClick, onRemove }: 
     }
     start()
     return () => { stream?.getTracks().forEach(t => t.stop()) }
-  }, [camera.deviceId, isDisconnected])
+  }, [camera.deviceId, isDisconnected, isActive, activeStream])
 
   return (
     <div
@@ -81,7 +92,7 @@ function CameraPreview({ camera, isActive, isDisconnected, onClick, onRemove }: 
 }
 
 export function CameraPanel({
-  cameras, activeCamera, onSelectCamera, onRefresh, onRemoveCamera,
+  cameras, activeCamera, activeCameraStream, onSelectCamera, onRefresh, onRemoveCamera,
   isLoading, error, camView, onCamViewChange,
   manualFallback, onToggleManualFallback, disconnectedIds,
 }: CameraPanelProps) {
@@ -135,6 +146,7 @@ export function CameraPanel({
               camera={camera}
               isActive={activeCamera?.id === camera.id}
               isDisconnected={disconnectedIds.has(camera.deviceId)}
+              activeStream={activeCamera?.id === camera.id ? activeCameraStream : null}
               onClick={() => onSelectCamera(camera)}
               onRemove={e => { e.stopPropagation(); onRemoveCamera(camera.deviceId) }}
             />

@@ -538,6 +538,7 @@ function App() {
           <CameraPanel
             cameras={cameras.cameras}
             activeCamera={cameras.activeCamera}
+            activeCameraStream={cameras.activeCameraStream}
             onSelectCamera={cameras.selectCamera}
             onRefresh={cameras.refreshCameras}
             onRemoveCamera={cameras.removeCamera}
