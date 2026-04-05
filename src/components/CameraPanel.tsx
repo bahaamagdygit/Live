@@ -7,21 +7,31 @@ interface CameraPanelProps {
   activeCamera: Camera | null
   onSelectCamera: (camera: Camera) => void
   onRefresh: () => void
+  onRemoveCamera: (deviceId: string) => void
   isLoading: boolean
   error: string | null
   camView: CameraViewSettings
   onCamViewChange: (patch: Partial<CameraViewSettings>) => void
   manualFallback: boolean
   onToggleManualFallback: () => void
+  disconnectedIds: Set<string>
 }
 
-function CameraPreview({ camera, isActive, onClick }: {
-  camera: Camera; isActive: boolean; onClick: () => void
+function CameraPreview({ camera, isActive, isDisconnected, onClick, onRemove }: {
+  camera: Camera
+  isActive: boolean
+  isDisconnected: boolean
+  onClick: () => void
+  onRemove: (e: React.MouseEvent) => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [previewError, setPreviewError] = useState(false)
 
   useEffect(() => {
+    if (isDisconnected) {
+      setPreviewError(true)
+      return
+    }
     let stream: MediaStream | null = null
     const start = async () => {
       try {
@@ -30,33 +40,50 @@ function CameraPreview({ camera, isActive, onClick }: {
           audio: false,
         })
         if (videoRef.current) videoRef.current.srcObject = stream
+        setPreviewError(false)
       } catch { setPreviewError(true) }
     }
     start()
     return () => { stream?.getTracks().forEach(t => t.stop()) }
-  }, [camera.deviceId])
+  }, [camera.deviceId, isDisconnected])
 
   return (
-    <div className={`camera-card ${isActive ? 'camera-card--active' : ''}`} onClick={onClick} title={camera.label}>
+    <div
+      className={`camera-card ${isActive ? 'camera-card--active' : ''} ${isDisconnected ? 'camera-card--disconnected' : ''}`}
+      onClick={isDisconnected ? undefined : onClick}
+      title={isDisconnected ? `${camera.label} — Not connected` : camera.label}
+    >
       <div className="camera-preview">
-        {previewError
-          ? <div className="camera-preview__error"><span className="icon">📷</span></div>
+        {previewError || isDisconnected
+          ? (
+            <div className="camera-preview__error">
+              <span className="icon">📷</span>
+              {isDisconnected && <span className="camera-preview__error-label">Not connected</span>}
+            </div>
+          )
           : <video ref={videoRef} autoPlay muted playsInline className="camera-preview__video" />
         }
-        {isActive && <div className="camera-preview__active-badge">LIVE</div>}
+        {isActive && !isDisconnected && <div className="camera-preview__active-badge">LIVE</div>}
+        {isDisconnected && <div className="camera-preview__disconnected-badge">OFFLINE</div>}
       </div>
       <div className="camera-card__info">
-        {isActive && <span className="camera-card__dot" />}
+        {isActive && !isDisconnected && <span className="camera-card__dot" />}
         <span className="camera-card__label" title={camera.label}>{camera.label}</span>
+        <button
+          type="button"
+          className="camera-card__remove"
+          onClick={onRemove}
+          title="Remove camera"
+        >×</button>
       </div>
     </div>
   )
 }
 
 export function CameraPanel({
-  cameras, activeCamera, onSelectCamera, onRefresh,
+  cameras, activeCamera, onSelectCamera, onRefresh, onRemoveCamera,
   isLoading, error, camView, onCamViewChange,
-  manualFallback, onToggleManualFallback,
+  manualFallback, onToggleManualFallback, disconnectedIds,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
   const set = (patch: Partial<CameraViewSettings>) => onCamViewChange(patch)
@@ -103,8 +130,14 @@ export function CameraPanel({
 
         <div className="camera-list">
           {cameras.map(camera => (
-            <CameraPreview key={camera.id} camera={camera}
-              isActive={activeCamera?.id === camera.id} onClick={() => onSelectCamera(camera)} />
+            <CameraPreview
+              key={camera.id}
+              camera={camera}
+              isActive={activeCamera?.id === camera.id}
+              isDisconnected={disconnectedIds.has(camera.deviceId)}
+              onClick={() => onSelectCamera(camera)}
+              onRemove={e => { e.stopPropagation(); onRemoveCamera(camera.deviceId) }}
+            />
           ))}
         </div>
 
@@ -113,7 +146,6 @@ export function CameraPanel({
           <div className="cam-settings">
             <div className="cam-settings__title">⚙️ {activeCamera.label}</div>
 
-            {/* Selects — 2-col grid */}
             <div className="cam-settings__selects-grid">
               <div className="cam-settings__select-block">
                 <label className="cam-settings__label">Resolution</label>
@@ -148,7 +180,6 @@ export function CameraPanel({
               </div>
             </div>
 
-            {/* Sliders */}
             <div className="cam-settings__sliders">
               <div className="cam-settings__slider-row">
                 <label className="cam-settings__label">Zoom {camView.scale}%</label>
@@ -188,7 +219,6 @@ export function CameraPanel({
               </div>
             </div>
 
-            {/* Flip buttons */}
             <div className="cam-settings__row">
               <label className="cam-settings__label">Flip</label>
               <div className="cam-settings__flip-btns">

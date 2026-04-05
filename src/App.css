@@ -375,6 +375,51 @@
   font-weight: 600;
 }
 
+/* Disconnected camera card */
+.camera-card--disconnected {
+  opacity: 0.6;
+  cursor: default;
+  border-color: #555 !important;
+}
+.camera-card--disconnected:hover {
+  transform: none;
+  box-shadow: none;
+}
+.camera-preview__disconnected-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: #555;
+  color: #ccc;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+.camera-preview__error-label {
+  display: block;
+  font-size: 10px;
+  color: #888;
+  margin-top: 4px;
+}
+.camera-card__remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+.camera-card__remove:hover {
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.12);
+}
+
 .camera-status {
   display: flex;
   align-items: center;

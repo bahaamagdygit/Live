@@ -540,12 +540,14 @@ function App() {
             activeCamera={cameras.activeCamera}
             onSelectCamera={cameras.selectCamera}
             onRefresh={cameras.refreshCameras}
+            onRemoveCamera={cameras.removeCamera}
             isLoading={cameras.isLoading}
             error={cameras.cameraError}
             camView={cameras.camView}
             onCamViewChange={patch => cameras.setCamView(patch)}
             manualFallback={manualFallback}
             onToggleManualFallback={() => setManualFallback(v => !v)}
+            disconnectedIds={cameras.disconnectedIds}
           />
         </div>
 

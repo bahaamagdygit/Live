@@ -35,10 +35,12 @@ interface UseCamerasReturn {
   activeCameraStream: MediaStream | null
   selectCamera: (camera: Camera) => Promise<void>
   refreshCameras: () => Promise<void>
+  removeCamera: (deviceId: string) => void
   cameraError: string | null
   isLoading: boolean
   camView: CameraViewSettings
   setCamView: (patch: Partial<CameraViewSettings>) => void
+  disconnectedIds: Set<string>
 }
 
 export function useCameras(): UseCamerasReturn {
@@ -47,16 +49,16 @@ export function useCameras(): UseCamerasReturn {
   const [activeCameraStream, setActiveCameraStream] = useState<MediaStream | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  // Per-camera settings keyed by deviceId
   const [camViewMap, setCamViewMap] = useState<Record<string, CameraViewSettings>>({})
+  // deviceIds that failed to open
+  const [disconnectedIds, setDisconnectedIds] = useState<Set<string>>(new Set())
+
   const streamRef = useRef<MediaStream | null>(null)
   const camViewRef = useRef<CameraViewSettings>(DEFAULT_CAM_VIEW)
   const activeCameraRef = useRef<Camera | null>(null)
   const camViewMapRef = useRef<Record<string, CameraViewSettings>>({})
-  // Ref so refreshCameras can call selectCameraById without circular deps
   const selectCameraByIdRef = useRef<(camera: Camera, overrideView?: CameraViewSettings) => Promise<void>>(async () => {})
 
-  // Keep camViewMapRef in sync
   useEffect(() => { camViewMapRef.current = camViewMap }, [camViewMap])
 
   const stopCurrentStream = useCallback(() => {
@@ -101,20 +103,27 @@ export function useCameras(): UseCamerasReturn {
           setActiveCameraStream(stream)
           setActiveCamera(camera)
           activeCameraRef.current = camera
+          // Mark as connected
+          setDisconnectedIds(prev => {
+            const next = new Set(prev)
+            next.delete(camera.deviceId)
+            return next
+          })
           return
         } catch (err: any) {
           lastErr = err
         }
       }
 
+      // All attempts failed — mark as disconnected
+      setDisconnectedIds(prev => new Set(prev).add(camera.deviceId))
       setCameraError(
-        `Cannot access camera: ${lastErr?.message || 'Unknown error'}. Make sure camera permissions are granted.`
+        `Cannot access "${camera.label}": ${lastErr?.message || 'Not connected'}.`
       )
     },
     [stopCurrentStream]
   )
 
-  // Keep ref in sync so refreshCameras can call it
   useEffect(() => { selectCameraByIdRef.current = selectCameraById }, [selectCameraById])
 
   const refreshCameras = useCallback(async () => {
@@ -122,10 +131,8 @@ export function useCameras(): UseCamerasReturn {
     setCameraError(null)
 
     try {
-      // First, enumerate via browser MediaDevices API
       let browserDevices: Camera[] = []
       try {
-        // Request permission first
         const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
         tempStream.getTracks().forEach((t) => t.stop())
 
@@ -137,10 +144,8 @@ export function useCameras(): UseCamerasReturn {
             label: d.label || `Camera ${idx + 1}`,
             deviceId: d.deviceId || String(idx),
           }))
-      } catch (err) {
-      }
+      } catch (err) {}
 
-      // Also try Electron API for system-level camera list
       let electronDevices: Camera[] = []
       if (window.electronAPI) {
         try {
@@ -148,15 +153,26 @@ export function useCameras(): UseCamerasReturn {
           if (result?.success && result.cameras?.length > 0) {
             electronDevices = result.cameras
           }
-        } catch (err) {
-        }
+        } catch (err) {}
       }
 
-      // Merge: prefer browser devices (they have proper deviceIds for getUserMedia)
-      const merged =
-        browserDevices.length > 0 ? browserDevices : electronDevices
+      const merged = browserDevices.length > 0 ? browserDevices : electronDevices
 
-      setCameras(merged)
+      // Merge with existing manually-kept cameras (those not in the new list stay if user hasn't removed them)
+      setCameras(prev => {
+        // Keep cameras from prev that are NOT in the new list (manually added / disconnected but kept)
+        const newIds = new Set(merged.map(c => c.deviceId))
+        const kept = prev.filter(c => !newIds.has(c.deviceId))
+        return [...merged, ...kept]
+      })
+
+      // Clear disconnected state for cameras that are now physically present
+      const mergedIds = new Set(merged.map(c => c.deviceId))
+      setDisconnectedIds(prev => {
+        const next = new Set(prev)
+        for (const id of mergedIds) next.delete(id)
+        return next
+      })
 
       // Auto-select first camera if none selected
       if (merged.length > 0 && !activeCameraRef.current) {
@@ -172,16 +188,29 @@ export function useCameras(): UseCamerasReturn {
     }
   }, [])
 
-  // Current active camera's view (falls back to defaults)
+  // Remove a camera from the list entirely
+  const removeCamera = useCallback((deviceId: string) => {
+    setCameras(prev => prev.filter(c => c.deviceId !== deviceId))
+    setDisconnectedIds(prev => {
+      const next = new Set(prev)
+      next.delete(deviceId)
+      return next
+    })
+    // If it was the active camera, deselect
+    if (activeCameraRef.current?.deviceId === deviceId) {
+      stopCurrentStream()
+      setActiveCamera(null)
+      activeCameraRef.current = null
+    }
+  }, [stopCurrentStream])
+
   const camView: CameraViewSettings = activeCamera
     ? (camViewMap[activeCamera.deviceId] ?? DEFAULT_CAM_VIEW)
     : DEFAULT_CAM_VIEW
 
-  // Keep ref in sync
   useEffect(() => { camViewRef.current = camView }, [camView])
   useEffect(() => { activeCameraRef.current = activeCamera }, [activeCamera])
 
-  // Patch settings only for the active camera
   const setCamView = useCallback((patch: Partial<CameraViewSettings>) => {
     if (!activeCameraRef.current) return
     const deviceId = activeCameraRef.current.deviceId
@@ -191,7 +220,6 @@ export function useCameras(): UseCamerasReturn {
     }))
   }, [])
 
-  // Re-open stream when resolution or frameRate changes for active camera
   const prevResRef = useRef(camView.resolution)
   const prevFpsRef = useRef(camView.frameRate)
   useEffect(() => {
@@ -204,7 +232,6 @@ export function useCameras(): UseCamerasReturn {
 
   const selectCamera = useCallback(
     async (camera: Camera) => {
-      // Load this camera's saved settings when switching
       const savedView = camViewMap[camera.deviceId] ?? DEFAULT_CAM_VIEW
       camViewRef.current = savedView
       await selectCameraById(camera, savedView)
@@ -214,8 +241,6 @@ export function useCameras(): UseCamerasReturn {
 
   useEffect(() => {
     refreshCameras()
-
-    // Listen for device changes
     navigator.mediaDevices.addEventListener('devicechange', refreshCameras)
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', refreshCameras)
@@ -229,9 +254,11 @@ export function useCameras(): UseCamerasReturn {
     activeCameraStream,
     selectCamera,
     refreshCameras,
+    removeCamera,
     cameraError,
     isLoading,
     camView,
     setCamView,
+    disconnectedIds,
   }
 }
