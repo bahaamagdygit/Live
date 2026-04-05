@@ -315,6 +315,70 @@ export default function PresentationApp() {
   )
 }
 
+// ── Auto-shrink hook ──────────────────────────────────────────────────────────
+// Measures the panel container and shrinks font size until text fits.
+function useFitFontSize(
+  line1: string,
+  line2: string,
+  baseFontSize: number,
+  fontFamily: string,
+  line1Bold: boolean,
+  panelRef: React.RefObject<HTMLDivElement>,
+  line1Ref: React.RefObject<HTMLDivElement>,
+  line2Ref: React.RefObject<HTMLDivElement>,
+): number {
+  const MIN = 14
+  const [fitSize, setFitSize] = useState(baseFontSize)
+
+  useEffect(() => {
+    const measure = () => {
+      const panel = panelRef.current
+      const el1 = line1Ref.current
+      if (!panel || !el1) { setFitSize(baseFontSize); return }
+
+      const panelW = panel.offsetWidth
+      const panelH = panel.offsetHeight
+      if (!panelW || !panelH) { setFitSize(baseFontSize); return }
+
+      let size = baseFontSize
+
+      const check = (): boolean => {
+        // Apply tentative size
+        el1.style.fontSize = `${size}px`
+        if (line2Ref.current) {
+          line2Ref.current.style.fontSize = `${Math.max(13, Math.round(size * 0.6))}px`
+        }
+        // Force reflow
+        void el1.offsetHeight
+
+        const totalH =
+          (el1.scrollHeight || 0) +
+          (line2Ref.current ? (line2Ref.current.scrollHeight || 0) : 0)
+
+        const overflowW = el1.scrollWidth > panelW
+        const overflowH = totalH > panelH
+
+        return overflowW || overflowH
+      }
+
+      // Shrink loop
+      while (check() && size > MIN) size--
+
+      setFitSize(size)
+    }
+
+    // Run on next frame so DOM has rendered
+    const raf = requestAnimationFrame(measure)
+
+    const ro = new ResizeObserver(() => requestAnimationFrame(measure))
+    if (panelRef.current) ro.observe(panelRef.current)
+
+    return () => { cancelAnimationFrame(raf); ro.disconnect() }
+  }, [line1, line2, baseFontSize, fontFamily, line1Bold, panelRef, line1Ref, line2Ref])
+
+  return fitSize
+}
+
 export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, textColor, alignment,
   line1Bold, line2Bold,
   line2FontSize, line2FontFamily, line2TextColor,
@@ -331,6 +395,15 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
     panelHeight?: number;
   }) {
   const particlesRef = useRef<HTMLDivElement>(null)
+  const panelBodyRef = useRef<HTMLDivElement>(null)
+  const line1Ref = useRef<HTMLDivElement>(null)
+  const line2Ref = useRef<HTMLDivElement>(null)
+
+  const fitFontSize = useFitFontSize(
+    line1, line2, fontSize, fontFamily, line1Bold,
+    panelBodyRef, line1Ref, line2Ref
+  )
+  const fitLine2Size = Math.max(13, Math.round(fitFontSize * 0.6))
 
   useEffect(() => {
     const container = particlesRef.current
@@ -815,33 +888,48 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
               <circle cx="45" cy="12" r="3" fill="#f5e27a" />
             </svg>
           </div>
-          {visible && line1 && (
-            <div
-              className="church-reading-line1"
-              dir={isRtl(line1) ? 'rtl' : 'ltr'}
-              style={{ fontSize: `${fontSize}px`, fontFamily, color: textColor, textAlign: alignment as any, fontWeight: line1Bold ? 'bold' : 'normal' }}
-            >{line1}</div>
-          )}
-          {visible && line1 && line2 && (
-            <div className="church-reading-divider">
-              <div className="church-reading-divider-line" />
-              <div className="church-reading-divider-diamond" />
-              <div className="church-reading-divider-line" />
-            </div>
-          )}
-          {visible && line2 && (
-            <div
-              className="church-reading-line2"
-              dir={isRtl(line2) ? 'rtl' : 'ltr'}
-              style={{
-                fontSize: `${line2FontSize ?? Math.round(fontSize * 0.6)}px`,
-                fontFamily: line2FontFamily ?? fontFamily,
-                color: line2TextColor ?? textColor,
-                textAlign: alignment as any,
-                fontWeight: line2Bold ? 'bold' : 'normal',
-              }}
-            >{line2}</div>
-          )}
+          <div ref={panelBodyRef} className="church-reading-body">
+            {visible && line1 && (
+              <div
+                ref={line1Ref}
+                className="church-reading-line1"
+                dir={isRtl(line1) ? 'rtl' : 'ltr'}
+                style={{
+                  fontSize: `${fitFontSize}px`,
+                  fontFamily,
+                  color: textColor,
+                  textAlign: alignment as any,
+                  fontWeight: line1Bold ? 'bold' : 'normal',
+                  whiteSpace: line1.includes('\n') ? 'normal' : 'normal',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word',
+                }}
+              >{line1}</div>
+            )}
+            {visible && line1 && line2 && (
+              <div className="church-reading-divider">
+                <div className="church-reading-divider-line" />
+                <div className="church-reading-divider-diamond" />
+                <div className="church-reading-divider-line" />
+              </div>
+            )}
+            {visible && line2 && (
+              <div
+                ref={line2Ref}
+                className="church-reading-line2"
+                dir={isRtl(line2) ? 'rtl' : 'ltr'}
+                style={{
+                  fontSize: `${fitLine2Size}px`,
+                  fontFamily: line2FontFamily ?? fontFamily,
+                  color: line2TextColor ?? textColor,
+                  textAlign: alignment as any,
+                  fontWeight: line2Bold ? 'bold' : 'normal',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word',
+                }}
+              >{line2}</div>
+            )}
+          </div>
         </div>
       </div>
 

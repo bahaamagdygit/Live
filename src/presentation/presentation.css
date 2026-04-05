@@ -368,6 +368,16 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  overflow: hidden;
+}
+
+/* Wraps line1 + divider + line2 — used for fit measurement */
+.church-reading-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
 }
 .church-panel-side {
   position: absolute; top: 0; bottom: 0;
