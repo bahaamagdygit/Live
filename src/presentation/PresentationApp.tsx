@@ -315,68 +315,65 @@ export default function PresentationApp() {
   )
 }
 
-// ── Auto-shrink hook ──────────────────────────────────────────────────────────
-// Measures the panel container and shrinks font size until text fits.
-function useFitFontSize(
+// ── Auto-shrink — applies font size directly to DOM, zero React re-renders ────
+function useAutoShrinkFont(
   line1: string,
   line2: string,
   baseFontSize: number,
   fontFamily: string,
   line1Bold: boolean,
-  panelRef: React.RefObject<HTMLDivElement>,
+  panelBodyRef: React.RefObject<HTMLDivElement>,
   line1Ref: React.RefObject<HTMLDivElement>,
   line2Ref: React.RefObject<HTMLDivElement>,
-): number {
+) {
   const MIN = 14
-  const [fitSize, setFitSize] = useState(baseFontSize)
 
   useEffect(() => {
-    const measure = () => {
-      const panel = panelRef.current
+    const apply = () => {
+      const body = panelBodyRef.current
       const el1 = line1Ref.current
-      if (!panel || !el1) { setFitSize(baseFontSize); return }
+      if (!body || !el1) return
 
-      const panelW = panel.offsetWidth
-      const panelH = panel.offsetHeight
-      if (!panelW || !panelH) { setFitSize(baseFontSize); return }
+      // Measure the actual panel (.church-reading-panel) — parent of body
+      const panel = body.parentElement
+      if (!panel) return
 
-      let size = baseFontSize
+      const panelW = panel.clientWidth
+      const panelH = panel.clientHeight
+      if (!panelW || !panelH) return
 
-      const check = (): boolean => {
-        // Apply tentative size
+      const applySize = (size: number) => {
         el1.style.fontSize = `${size}px`
         if (line2Ref.current) {
           line2Ref.current.style.fontSize = `${Math.max(13, Math.round(size * 0.6))}px`
         }
-        // Force reflow
-        void el1.offsetHeight
-
-        const totalH =
-          (el1.scrollHeight || 0) +
-          (line2Ref.current ? (line2Ref.current.scrollHeight || 0) : 0)
-
-        const overflowW = el1.scrollWidth > panelW
-        const overflowH = totalH > panelH
-
-        return overflowW || overflowH
       }
 
-      // Shrink loop
-      while (check() && size > MIN) size--
+      const isOverflow = (): boolean => {
+        // Force reflow
+        void panel.offsetHeight
+        const el2 = line2Ref.current
+        const totalH = el1.scrollHeight + (el2 ? el2.scrollHeight : 0)
+        return el1.scrollWidth > panelW || totalH > panelH
+      }
 
-      setFitSize(size)
+      // Start at baseFontSize and shrink until it fits
+      let size = baseFontSize
+      applySize(size)
+      while (isOverflow() && size > MIN) {
+        size--
+        applySize(size)
+      }
     }
 
-    // Run on next frame so DOM has rendered
-    const raf = requestAnimationFrame(measure)
+    const raf = requestAnimationFrame(apply)
 
-    const ro = new ResizeObserver(() => requestAnimationFrame(measure))
-    if (panelRef.current) ro.observe(panelRef.current)
+    // Re-run when panel resizes (layout/width/height changes)
+    const ro = new ResizeObserver(() => requestAnimationFrame(apply))
+    if (panelBodyRef.current?.parentElement) ro.observe(panelBodyRef.current.parentElement)
 
     return () => { cancelAnimationFrame(raf); ro.disconnect() }
-  }, [line1, line2, baseFontSize, fontFamily, line1Bold, panelRef, line1Ref, line2Ref])
-
-  return fitSize
+  }, [line1, line2, baseFontSize, fontFamily, line1Bold])
 }
 
 export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamily, textColor, alignment,
@@ -399,11 +396,10 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
   const line1Ref = useRef<HTMLDivElement>(null)
   const line2Ref = useRef<HTMLDivElement>(null)
 
-  const fitFontSize = useFitFontSize(
+  useAutoShrinkFont(
     line1, line2, fontSize, fontFamily, line1Bold,
     panelBodyRef, line1Ref, line2Ref
   )
-  const fitLine2Size = Math.max(13, Math.round(fitFontSize * 0.6))
 
   useEffect(() => {
     const container = particlesRef.current
@@ -895,12 +891,11 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
                 className="church-reading-line1"
                 dir={isRtl(line1) ? 'rtl' : 'ltr'}
                 style={{
-                  fontSize: `${fitFontSize}px`,
+                  fontSize: `${fontSize}px`,
                   fontFamily,
                   color: textColor,
                   textAlign: alignment as any,
                   fontWeight: line1Bold ? 'bold' : 'normal',
-                  whiteSpace: line1.includes('\n') ? 'normal' : 'normal',
                   wordBreak: 'break-word',
                   overflowWrap: 'break-word',
                 }}
@@ -919,7 +914,7 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
                 className="church-reading-line2"
                 dir={isRtl(line2) ? 'rtl' : 'ltr'}
                 style={{
-                  fontSize: `${fitLine2Size}px`,
+                  fontSize: `${Math.max(13, Math.round(fontSize * 0.6))}px`,
                   fontFamily: line2FontFamily ?? fontFamily,
                   color: line2TextColor ?? textColor,
                   textAlign: alignment as any,
