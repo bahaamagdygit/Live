@@ -106,6 +106,7 @@ async function createWindow() {
         },
         cameraFallback: {
           filePath: '',
+          base64: '',
           fit: 'cover',
         },
         hotkeys: {
@@ -738,6 +739,7 @@ ipcMain.handle('save-settings', async (_event, settings: any) => {
     if (settings.streamConfig) store.set('streamConfig', settings.streamConfig)
     if (settings.overlaySettings) store.set('overlaySettings', settings.overlaySettings)
     if (settings.logoSettings) store.set('logoSettings', settings.logoSettings)
+    if (settings.cameraFallback) store.set('cameraFallback', settings.cameraFallback)
     if (settings.hotkeys) {
       store.set('hotkeys', settings.hotkeys)
       // Re-register hotkeys

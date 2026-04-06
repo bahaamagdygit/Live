@@ -133,13 +133,14 @@ function App() {
               setLogoSettings((prev) => ({ ...prev, base64: logoData.base64 }))
             }
           }
-          // Load fallback image data if path exists
+          // Load fallback image data if path exists but base64 not stored yet
           if (loaded.cameraFallback.filePath && !loaded.cameraFallback.base64) {
             const imgData = await window.electronAPI.getLogoData(loaded.cameraFallback.filePath)
             if (imgData?.success && imgData.base64) {
               setCameraFallback((prev) => ({ ...prev, base64: imgData.base64 }))
             }
           }
+          // base64 already stored — nothing extra needed
         }
       } catch (err) {
       } finally {
@@ -446,6 +447,7 @@ function App() {
           },
           cameraFallback: {
             filePath: newSettings.cameraFallback.filePath,
+            base64: newSettings.cameraFallback.base64 || '',
             fit: newSettings.cameraFallback.fit,
           },
           hotkeys: newSettings.hotkeys,
