@@ -4,9 +4,11 @@ import { MainPreview } from './components/MainPreview'
 import { TextControls } from './components/TextControls'
 import { StreamControls } from './components/StreamControls'
 import { SettingsModal } from './components/SettingsModal'
+import { VideoOverlayPanel } from './components/VideoOverlayPanel'
 import { useCameras } from './hooks/useCameras'
 import { useStream } from './hooks/useStream'
 import { useSlides } from './hooks/useSlides'
+import { useVideoOverlay } from './hooks/useVideoOverlay'
 import { AppSettings, OverlaySettings, LogoSettings, CameraFallbackSettings } from './types'
 import './App.css'
 
@@ -88,6 +90,7 @@ function App() {
   const cameras = useCameras()
   const stream = useStream()
   const slides = useSlides()
+  const videoOverlay = useVideoOverlay()
 
   // Load settings on startup
   useEffect(() => {
@@ -291,8 +294,23 @@ function App() {
       fallbackBase64: cameraFallback.base64 || '',
       fallbackFit: cameraFallback.fit,
       manualFallback,
+      // Video overlay
+      videoBase64: videoOverlay.settings.visible
+        ? (videoOverlay.videos.find(v => v.id === videoOverlay.settings.activeId)?.base64 || '')
+        : '',
+      videoMimeType: videoOverlay.videos.find(v => v.id === videoOverlay.settings.activeId)?.mimeType || 'video/mp4',
+      videoVisible: videoOverlay.settings.visible,
+      videoOpacity: videoOverlay.settings.opacity,
+      videoVolume: videoOverlay.settings.volume,
+      videoMuted: videoOverlay.settings.muted,
+      videoLoop: videoOverlay.settings.loop,
+      videoPosX: videoOverlay.settings.positionX,
+      videoPosY: videoOverlay.settings.positionY,
+      videoWidth: videoOverlay.settings.width,
+      videoHeight: videoOverlay.settings.height,
+      videoMaintainAspect: videoOverlay.settings.maintainAspect,
     })
-  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback, manualFallback])
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback, manualFallback, videoOverlay.settings, videoOverlay.videos])
 
   // ── PPTX Controller window ──────────────────────────────────────────────────
 
@@ -400,10 +418,24 @@ function App() {
           fallbackBase64: cameraFallback.base64 || '',
           fallbackFit: cameraFallback.fit,
           manualFallback,
+          videoBase64: videoOverlay.settings.visible
+            ? (videoOverlay.videos.find(v => v.id === videoOverlay.settings.activeId)?.base64 || '')
+            : '',
+          videoMimeType: videoOverlay.videos.find(v => v.id === videoOverlay.settings.activeId)?.mimeType || 'video/mp4',
+          videoVisible: videoOverlay.settings.visible,
+          videoOpacity: videoOverlay.settings.opacity,
+          videoVolume: videoOverlay.settings.volume,
+          videoMuted: videoOverlay.settings.muted,
+          videoLoop: videoOverlay.settings.loop,
+          videoPosX: videoOverlay.settings.positionX,
+          videoPosY: videoOverlay.settings.positionY,
+          videoWidth: videoOverlay.settings.width,
+          videoHeight: videoOverlay.settings.height,
+          videoMaintainAspect: videoOverlay.settings.maintainAspect,
         })
       }
     }
-  }, [isPresentationOpen, overlaySettings, slides.currentSlideIndex, slides.slides.length, selectedDisplayId])
+  }, [isPresentationOpen, overlaySettings, slides.currentSlideIndex, slides.slides.length, selectedDisplayId, videoOverlay.settings, videoOverlay.videos])
 
   const handleToggleText = useCallback(() => {
     setOverlaySettings((prev) => ({ ...prev, visible: !prev.visible }))
@@ -535,7 +567,7 @@ function App() {
 
       {/* Main content area */}
       <main className="app-main">
-        {/* Left: Camera Panel */}
+        {/* Left: Camera Panel + Video Overlay Panel */}
         <div className="app-main__left">
           <CameraPanel
             cameras={cameras.cameras}
@@ -554,6 +586,21 @@ function App() {
             onToggleManualFallback={() => setManualFallback(v => !v)}
             disconnectedIds={cameras.disconnectedIds}
           />
+          <VideoOverlayPanel
+            videos={videoOverlay.videos}
+            settings={videoOverlay.settings}
+            isPlaying={videoOverlay.isPlaying}
+            currentTime={videoOverlay.currentTime}
+            duration={videoOverlay.duration}
+            onAddVideo={videoOverlay.addVideo}
+            onRemoveVideo={videoOverlay.removeVideo}
+            onSelectVideo={videoOverlay.selectVideo}
+            onUpdateSettings={videoOverlay.updateSettings}
+            onPlay={videoOverlay.play}
+            onPause={videoOverlay.pause}
+            onStop={videoOverlay.stop}
+            onSeek={videoOverlay.seek}
+          />
         </div>
 
         {/* Center: Main Preview */}
@@ -565,6 +612,8 @@ function App() {
             cameraFallback={cameraFallback}
             manualFallback={manualFallback}
             camView={cameras.camView}
+            videoOverlay={videoOverlay.settings}
+            onVideoElMount={videoOverlay.setVideoEl}
           />
         </div>
 

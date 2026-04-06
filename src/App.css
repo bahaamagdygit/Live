@@ -2003,3 +2003,114 @@ select option {
     display: none;
   }
 }
+
+/* ====== VIDEO OVERLAY PANEL ====== */
+
+.video-overlay-panel .panel__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.vop__library {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.vop__video-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: var(--color-bg-medium);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.vop__video-item:hover { border-color: var(--color-accent); background: var(--color-bg-hover); }
+.vop__video-item--active { border-color: var(--color-accent); background: rgba(200,16,46,0.1); }
+
+.vop__video-icon { font-size: 14px; flex-shrink: 0; }
+.vop__video-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vop__video-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+.vop__video-remove:hover { color: #ff4444; background: rgba(255,68,68,0.12); }
+
+.vop__section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 3px;
+}
+
+.vop__progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vop__progress { flex: 1; }
+.vop__time { font-size: 10px; color: var(--color-text-muted); white-space: nowrap; }
+
+.vop__playback-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.vop__slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vop__label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.vop__slider-row input[type=range] { width: 100%; }
+
+.vop__grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.vop__check-row { display: flex; align-items: center; }
+.vop__check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.vop__preset-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}

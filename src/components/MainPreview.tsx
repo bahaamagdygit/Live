@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { OverlaySettings, LogoSettings, CameraFallbackSettings } from '../types'
+import { OverlaySettings, LogoSettings, CameraFallbackSettings, VideoOverlaySettings } from '../types'
 import { ChurchBorderOverlay } from '../presentation/PresentationApp'
 import '../presentation/presentation.css'
 
@@ -20,9 +20,10 @@ interface MainPreviewProps {
     flipH: boolean
     flipV: boolean
   }
+  videoOverlay?: VideoOverlaySettings
+  onVideoElMount?: (el: HTMLVideoElement | null) => void
 }
 
-// Presentation screen native resolution
 const PRESENT_W = 1920
 const PRESENT_H = 1080
 
@@ -33,8 +34,10 @@ export function MainPreview({
   cameraFallback,
   manualFallback = false,
   camView,
+  videoOverlay,
+  onVideoElMount,
 }: MainPreviewProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const cameraVideoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -52,13 +55,10 @@ export function MainPreview({
     return () => ro.disconnect()
   }, [])
 
-  // Camera stream management — mirrors PresentationApp logic
+  // Camera stream management
   useEffect(() => {
     const deviceId = cameraDeviceId
-    if (!deviceId) {
-      setCameraFailed(true)
-      return
-    }
+    if (!deviceId) { setCameraFailed(true); return }
 
     let stopped = false
     let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -74,21 +74,18 @@ export function MainPreview({
         streamRef.current.getTracks().forEach(t => t.stop())
         streamRef.current = null
       }
-      if (videoRef.current) videoRef.current.srcObject = null
+      if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null
     }
 
     const captureFrame = (): Uint8ClampedArray | null => {
-      const video = videoRef.current
+      const video = cameraVideoRef.current
       const canvas = canvasRef.current
       if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) return null
       const ctx = canvas.getContext('2d')
       if (!ctx) return null
-      canvas.width = 32
-      canvas.height = 18
-      try {
-        ctx.drawImage(video, 0, 0, 32, 18)
-        return ctx.getImageData(0, 0, 32, 18).data
-      } catch { return null }
+      canvas.width = 32; canvas.height = 18
+      try { ctx.drawImage(video, 0, 0, 32, 18); return ctx.getImageData(0, 0, 32, 18).data }
+      catch { return null }
     }
 
     const framesAreSame = (a: Uint8ClampedArray, b: Uint8ClampedArray): boolean => {
@@ -106,11 +103,7 @@ export function MainPreview({
           if (!brightnessInterval) return
           const frame2 = captureFrame()
           if (!frame2) return
-          if (framesAreSame(frame1, frame2)) {
-            setCameraFailed(true)
-          } else {
-            setCameraFailed(false)
-          }
+          setCameraFailed(framesAreSame(frame1, frame2))
         }, 600)
       }, 2000)
     }
@@ -119,66 +112,37 @@ export function MainPreview({
       if (stopped) return
       stopStream()
       setCameraFailed(false)
-
-      const base: MediaTrackConstraints = deviceId.length > 5
-        ? { deviceId: { ideal: deviceId } } : {}
-
+      const base: MediaTrackConstraints = deviceId.length > 5 ? { deviceId: { ideal: deviceId } } : {}
       const attempts: MediaStreamConstraints[] = [
         { video: { ...base, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
         { video: { ...base }, audio: false },
         { video: true, audio: false },
       ]
-
       let stream: MediaStream | null = null
-      for (const constraints of attempts) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia(constraints)
-          break
-        } catch { /* try next */ }
-      }
-
+      for (const c of attempts) { try { stream = await navigator.mediaDevices.getUserMedia(c); break } catch {} }
       if (stopped) { stream?.getTracks().forEach(t => t.stop()); return }
-
       if (!stream) {
         setCameraFailed(true)
         retryTimer = setTimeout(() => { if (!stopped) startStream() }, 4000)
         return
       }
-
       streamRef.current = stream
-      if (videoRef.current) videoRef.current.srcObject = stream
-
-      const track = stream.getVideoTracks()[0]
-      if (track) {
-        track.addEventListener('ended', () => {
-          if (!stopped) {
-            setCameraFailed(true)
-            retryTimer = setTimeout(() => { if (!stopped) startStream() }, 4000)
-          }
-        })
-      }
-
-      const video = videoRef.current
+      if (cameraVideoRef.current) cameraVideoRef.current.srcObject = stream
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+        if (!stopped) { setCameraFailed(true); retryTimer = setTimeout(() => { if (!stopped) startStream() }, 4000) }
+      })
+      const video = cameraVideoRef.current
       if (video) {
-        const onPlaying = () => {
-          video.removeEventListener('playing', onPlaying)
-          startBrightnessCheck()
-        }
+        const onPlaying = () => { video.removeEventListener('playing', onPlaying); startBrightnessCheck() }
         video.addEventListener('playing', onPlaying)
       }
     }
 
     startStream()
-
-    return () => {
-      stopped = true
-      if (retryTimer) clearTimeout(retryTimer)
-      stopStream()
-    }
+    return () => { stopped = true; if (retryTimer) clearTimeout(retryTimer); stopStream() }
   }, [cameraDeviceId])
 
   const lines = overlaySettings.text ? overlaySettings.text.split('\n').filter(Boolean) : []
-
   const camScale = camView?.scale ?? 100
   const offsetX = camView?.offsetX ?? 0
   const offsetY = camView?.offsetY ?? 0
@@ -189,20 +153,20 @@ export function MainPreview({
   const saturation = camView?.saturation ?? 100
   const fit = camView?.fit ?? 'cover'
 
-  const scaleX = previewSize.w / PRESENT_W
-  const scaleY = previewSize.h / PRESENT_H
-  const scaleFactor = Math.min(scaleX, scaleY)
-
+  const scaleFactor = Math.min(previewSize.w / PRESENT_W, previewSize.h / PRESENT_H)
   const stageLeft = (previewSize.w - PRESENT_W * scaleFactor) / 2
   const stageTop = (previewSize.h - PRESENT_H * scaleFactor) / 2
-
   const showFallback = cameraFailed || manualFallback
+
+  const vx = videoOverlay?.positionX ?? 0
+  const vy = videoOverlay?.positionY ?? 0
+  const vw = videoOverlay?.width ?? 1920
+  const vh = videoOverlay?.height ?? 1080
 
   return (
     <div className="main-preview" ref={containerRef}>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* Fixed 1920×1080 inner stage, scaled down to fit preview */}
       <div
         className="main-preview__stage"
         style={{
@@ -215,27 +179,19 @@ export function MainPreview({
           top: stageTop,
         }}
       >
-        {/* Black background */}
         <div className="presentation-bg" />
 
-        {/* Fallback — shown when camera fails OR manually triggered */}
         {showFallback && (
           cameraFallback.base64
-            ? <img
-                src={cameraFallback.base64}
-                className={`presentation-fallback presentation-fallback--fit-${cameraFallback.fit ?? 'cover'}`}
-                alt=""
-              />
+            ? <img src={cameraFallback.base64} className={`presentation-fallback presentation-fallback--fit-${cameraFallback.fit ?? 'cover'}`} alt="" />
             : <div className="presentation-fallback presentation-fallback--default" />
         )}
 
         {/* Camera feed */}
         <video
-          ref={videoRef}
+          ref={cameraVideoRef}
           className="presentation-camera"
-          autoPlay
-          playsInline
-          muted
+          autoPlay playsInline muted
           style={{
             objectFit: fit,
             transform: `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
@@ -245,7 +201,21 @@ export function MainPreview({
           }}
         />
 
-        {/* Church border + reading panel */}
+        {/* Video overlay — callback ref wires hook directly to this element */}
+        <video
+          ref={onVideoElMount}
+          className="video-overlay-layer"
+          playsInline
+          style={{
+            display: videoOverlay?.visible ? 'block' : 'none',
+            opacity: videoOverlay?.opacity ?? 1,
+            left: `${960 + vx - vw / 2}px`,
+            top: `${540 + vy - vh / 2}px`,
+            width: `${vw}px`,
+            height: (videoOverlay?.maintainAspect ?? true) ? 'auto' : `${vh}px`,
+          }}
+        />
+
         <ChurchBorderOverlay
           line1={lines[0] || ''}
           line2={lines[1] || ''}

@@ -82,3 +82,27 @@ export interface AppSettings {
 
 export type StreamStatus = 'offline' | 'connecting' | 'live' | 'error'
 export type RecordingStatus = 'idle' | 'recording'
+
+// ── Video Overlay ──────────────────────────────────────────────────────────────
+
+export interface VideoOverlayItem {
+  id: string
+  name: string
+  filePath: string
+  base64: string        // data URL for rendering
+  mimeType: 'video/mp4' | 'video/webm'
+}
+
+export interface VideoOverlaySettings {
+  activeId: string | null
+  visible: boolean
+  opacity: number         // 0–1
+  volume: number          // 0–1
+  muted: boolean
+  loop: boolean
+  positionX: number       // px from left within 1920 stage
+  positionY: number       // px from top within 1080 stage
+  width: number           // px within 1920 stage (0 = natural)
+  height: number          // px within 1080 stage (0 = natural)
+  maintainAspect: boolean
+}

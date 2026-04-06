@@ -39,6 +39,56 @@ interface PresentationData {
   line2FontSize?: number
   line2FontFamily?: string
   line2TextColor?: string
+  // Video overlay
+  videoBase64?: string
+  videoMimeType?: string
+  videoVisible?: boolean
+  videoOpacity?: number
+  videoVolume?: number
+  videoMuted?: boolean
+  videoLoop?: boolean
+  videoPosX?: number
+  videoPosY?: number
+  videoWidth?: number
+  videoHeight?: number
+  videoMaintainAspect?: boolean
+}
+
+function VideoOverlayElement({ data }: { data: PresentationData }) {
+  const vRef = useRef<HTMLVideoElement>(null)
+  const posX = data.videoPosX ?? 0
+  const posY = data.videoPosY ?? 0
+  const w = data.videoWidth ?? 1920
+  const h = data.videoHeight ?? 1080
+
+  useEffect(() => {
+    const v = vRef.current
+    if (!v || !data.videoBase64) return
+    if (v.src !== data.videoBase64) {
+      v.src = data.videoBase64
+      v.load()
+      v.play().catch(() => {})
+    }
+    v.volume = data.videoVolume ?? 1
+    v.muted = data.videoMuted ?? false
+    v.loop = data.videoLoop ?? false
+  }, [data.videoBase64, data.videoVolume, data.videoMuted, data.videoLoop])
+
+  return (
+    <video
+      ref={vRef}
+      className="video-overlay-layer"
+      playsInline
+      autoPlay
+      style={{
+        opacity: data.videoOpacity ?? 1,
+        left: `${960 + posX - w / 2}px`,
+        top: `${540 + posY - h / 2}px`,
+        width: `${w}px`,
+        height: data.videoMaintainAspect ? 'auto' : `${h}px`,
+      }}
+    />
+  )
 }
 
 const DEFAULT_DATA: PresentationData = {
@@ -303,6 +353,11 @@ export default function PresentationApp() {
             display: (!cameraFailed && !data.manualFallback) ? 'block' : 'none',
           }}
         />
+
+        {/* Video overlay — above camera, below church border */}
+        {data.videoVisible && data.videoBase64 && (
+          <VideoOverlayElement data={data} />
+        )}
 
         {/* Church gold border overlay — text shown inside reading panel */}
         <ChurchBorderOverlay

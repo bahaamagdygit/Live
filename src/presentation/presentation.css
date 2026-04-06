@@ -443,3 +443,11 @@
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* ── Video overlay layer (above cameras, below church border) ── */
+.video-overlay-layer {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
