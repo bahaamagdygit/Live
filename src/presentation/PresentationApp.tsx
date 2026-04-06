@@ -53,6 +53,9 @@ const DEFAULT_DATA: PresentationData = {
   alignment: 'center',
 }
 
+const STAGE_W = 1920
+const STAGE_H = 1080
+
 export default function PresentationApp() {
   const [data, setData] = useState<PresentationData>(DEFAULT_DATA)
   const targetRef = useRef(0)
@@ -60,6 +63,13 @@ export default function PresentationApp() {
   const streamRef = useRef<MediaStream | null>(null)
   const [cameraFailed, setCameraFailed] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [screenSize, setScreenSize] = useState({ w: window.innerWidth, h: window.innerHeight })
+
+  useEffect(() => {
+    const onResize = () => setScreenSize({ w: window.innerWidth, h: window.innerHeight })
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const onCameraError = (reason: string) => {
     setCameraFailed(true)
@@ -245,72 +255,87 @@ export default function PresentationApp() {
     ? `rgba(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}, ${data.bgOpacity / 100})`
     : `rgba(0,0,0,0.7)`
 
+  const scaleFactor = Math.min(screenSize.w / STAGE_W, screenSize.h / STAGE_H)
+  const stageLeft = (screenSize.w - STAGE_W * scaleFactor) / 2
+  const stageTop = (screenSize.h - STAGE_H * scaleFactor) / 2
+
   return (
     <div className="presentation-root">
-      {/* Black background always */}
-      <div className="presentation-bg" />
-
-      {/* Hidden canvas used for brightness frame analysis (Case 2) */}
+      {/* Hidden canvas used for brightness frame analysis */}
       <canvas ref={canvasRef} className="presentation-canvas-hidden" />
 
-      {/* Fallback — shown when camera fails OR manually triggered */}
-      {(cameraFailed || data.manualFallback) && (
-        data.fallbackBase64
-          ? <img
-            src={data.fallbackBase64}
-            className={`presentation-fallback presentation-fallback--fit-${data.fallbackFit ?? 'cover'}`}
-            alt=""
-          />
-          : <div className="presentation-fallback presentation-fallback--default" />
-      )}
+      {/* Fixed 1920×1080 stage scaled to fit any screen — same as MainPreview */}
+      <div style={{
+        position: 'absolute',
+        width: STAGE_W,
+        height: STAGE_H,
+        transform: `scale(${scaleFactor})`,
+        transformOrigin: 'top left',
+        left: stageLeft,
+        top: stageTop,
+      }}>
+        {/* Black background always */}
+        <div className="presentation-bg" />
 
-      {/* Camera feed — hidden when manual fallback is active or camera failed */}
-      <video
-        ref={videoRef}
-        className="presentation-camera"
-        autoPlay
-        playsInline
-        muted
-        style={{
-          objectFit: data.cameraFit ?? 'cover',
-          transform: `scale(${(data.cameraScale ?? 100) / 100}) translate(${data.cameraX ?? 0}%, ${data.cameraY ?? 0}%) scaleX(${data.cameraFlipH ? -1 : 1}) scaleY(${data.cameraFlipV ? -1 : 1})`,
-          transformOrigin: 'center center',
-          filter: `brightness(${data.cameraBrightness ?? 100}%) contrast(${data.cameraContrast ?? 100}%) saturate(${data.cameraSaturation ?? 100}%)`,
-          display: (!cameraFailed && !data.manualFallback) ? 'block' : 'none',
-        }}
-      />
+        {/* Fallback — shown when camera fails OR manually triggered */}
+        {(cameraFailed || data.manualFallback) && (
+          data.fallbackBase64
+            ? <img
+              src={data.fallbackBase64}
+              className={`presentation-fallback presentation-fallback--fit-${data.fallbackFit ?? 'cover'}`}
+              alt=""
+            />
+            : <div className="presentation-fallback presentation-fallback--default" />
+        )}
 
-      {/* Church gold border overlay — text shown inside reading panel */}
-      <ChurchBorderOverlay
-        line1={lines[0] || ''}
-        line2={lines[1] || ''}
-        visible={data.visible}
-        fontSize={data.fontSize}
-        fontFamily={data.fontFamily}
-        textColor={data.textColor}
-        alignment={data.alignment}
-        line1Bold={data.line1Bold ?? true}
-        line2Bold={data.line2Bold ?? false}
-        line2FontSize={data.line2FontSize}
-        line2FontFamily={data.line2FontFamily}
-        line2TextColor={data.line2TextColor}
-        logoBase64={data.logoBase64 || ''}
-        logoPosition={data.logoPosition || 'top-right'}
-        logoSize={data.logoSize ?? 180}
-        logoOpacity={data.logoOpacity ?? 80}
-        logoVisible={data.logoVisible ?? true}
-        logoAnimation={data.logoAnimation || 'none'}
-        panelLayout={data.panelLayout || 'full'}
-        panelWidth={data.panelWidth ?? 100}
-        panelHeight={data.panelHeight ?? 20}
-      />
+        {/* Camera feed — hidden when manual fallback is active or camera failed */}
+        <video
+          ref={videoRef}
+          className="presentation-camera"
+          autoPlay
+          playsInline
+          muted
+          style={{
+            objectFit: data.cameraFit ?? 'cover',
+            transform: `scale(${(data.cameraScale ?? 100) / 100}) translate(${data.cameraX ?? 0}%, ${data.cameraY ?? 0}%) scaleX(${data.cameraFlipH ? -1 : 1}) scaleY(${data.cameraFlipV ? -1 : 1})`,
+            transformOrigin: 'center center',
+            filter: `brightness(${data.cameraBrightness ?? 100}%) contrast(${data.cameraContrast ?? 100}%) saturate(${data.cameraSaturation ?? 100}%)`,
+            display: (!cameraFailed && !data.manualFallback) ? 'block' : 'none',
+          }}
+        />
 
-      {/* Slide counter (bottom right) */}
-      {data.slideNumber !== undefined && data.totalSlides !== undefined && (
-        <div className="presentation-counter">
-          {data.slideNumber} / {data.totalSlides}
-        </div>
-      )}
+        {/* Church gold border overlay — text shown inside reading panel */}
+        <ChurchBorderOverlay
+          line1={lines[0] || ''}
+          line2={lines[1] || ''}
+          visible={data.visible}
+          fontSize={data.fontSize}
+          fontFamily={data.fontFamily}
+          textColor={data.textColor}
+          alignment={data.alignment}
+          line1Bold={data.line1Bold ?? true}
+          line2Bold={data.line2Bold ?? false}
+          line2FontSize={data.line2FontSize}
+          line2FontFamily={data.line2FontFamily}
+          line2TextColor={data.line2TextColor}
+          logoBase64={data.logoBase64 || ''}
+          logoPosition={data.logoPosition || 'top-right'}
+          logoSize={data.logoSize ?? 180}
+          logoOpacity={data.logoOpacity ?? 80}
+          logoVisible={data.logoVisible ?? true}
+          logoAnimation={data.logoAnimation || 'none'}
+          panelLayout={data.panelLayout || 'full'}
+          panelWidth={data.panelWidth ?? 100}
+          panelHeight={data.panelHeight ?? 20}
+        />
+
+        {/* Slide counter (bottom right) */}
+        {data.slideNumber !== undefined && data.totalSlides !== undefined && (
+          <div className="presentation-counter">
+            {data.slideNumber} / {data.totalSlides}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
