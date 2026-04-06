@@ -542,6 +542,8 @@ function App() {
             onSelectCamera={cameras.selectCamera}
             onRefresh={cameras.refreshCameras}
             onRemoveCamera={cameras.removeCamera}
+            onReorderCameras={cameras.reorderCameras}
+            onAddCamera={cameras.addCamera}
             isLoading={cameras.isLoading}
             error={cameras.cameraError}
             camView={cameras.camView}

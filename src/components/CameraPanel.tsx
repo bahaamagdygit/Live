@@ -9,6 +9,8 @@ interface CameraPanelProps {
   onSelectCamera: (camera: Camera) => void
   onRefresh: () => void
   onRemoveCamera: (deviceId: string) => void
+  onReorderCameras: (from: number, to: number) => void
+  onAddCamera: (label: string, deviceId: string) => void
   isLoading: boolean
   error: string | null
   camView: CameraViewSettings
@@ -18,31 +20,28 @@ interface CameraPanelProps {
   disconnectedIds: Set<string>
 }
 
-function CameraPreview({ camera, isActive, isDisconnected, activeStream, onClick, onRemove }: {
+function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragOver, onClick, onRemove, onDragStart, onDragOver, onDrop }: {
   camera: Camera
   isActive: boolean
   isDisconnected: boolean
   activeStream: MediaStream | null
+  isDragOver: boolean
   onClick: () => void
   onRemove: (e: React.MouseEvent) => void
+  onDragStart: (e: React.DragEvent) => void
+  onDragOver: (e: React.DragEvent) => void
+  onDrop: (e: React.DragEvent) => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [previewError, setPreviewError] = useState(false)
 
   useEffect(() => {
-    if (isDisconnected) {
-      setPreviewError(true)
-      return
-    }
-
-    // Active camera: reuse the existing stream — don't open a competing one
+    if (isDisconnected) { setPreviewError(true); return }
     if (isActive && activeStream) {
       if (videoRef.current) videoRef.current.srcObject = activeStream
       setPreviewError(false)
       return
     }
-
-    // Non-active camera: open a small thumbnail stream
     let stream: MediaStream | null = null
     const start = async () => {
       try {
@@ -60,10 +59,15 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, onClick
 
   return (
     <div
-      className={`camera-card ${isActive ? 'camera-card--active' : ''} ${isDisconnected ? 'camera-card--disconnected' : ''}`}
+      className={`camera-card ${isActive ? 'camera-card--active' : ''} ${isDisconnected ? 'camera-card--disconnected' : ''} ${isDragOver ? 'camera-card--drag-over' : ''}`}
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       onClick={isDisconnected ? undefined : onClick}
       title={isDisconnected ? `${camera.label} — Not connected` : camera.label}
     >
+      <div className="camera-card__drag-handle" title="Drag to reorder">⠿</div>
       <div className="camera-preview">
         {previewError || isDisconnected
           ? (
@@ -80,12 +84,7 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, onClick
       <div className="camera-card__info">
         {isActive && !isDisconnected && <span className="camera-card__dot" />}
         <span className="camera-card__label" title={camera.label}>{camera.label}</span>
-        <button
-          type="button"
-          className="camera-card__remove"
-          onClick={onRemove}
-          title="Remove camera"
-        >×</button>
+        <button type="button" className="camera-card__remove" onClick={onRemove} title="Remove camera">×</button>
       </div>
     </div>
   )
@@ -93,12 +92,48 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, onClick
 
 export function CameraPanel({
   cameras, activeCamera, activeCameraStream, onSelectCamera, onRefresh, onRemoveCamera,
+  onReorderCameras, onAddCamera,
   isLoading, error, camView, onCamViewChange,
   manualFallback, onToggleManualFallback, disconnectedIds,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addLabel, setAddLabel] = useState('')
+  const [addDeviceId, setAddDeviceId] = useState('')
+  const [dragFromIdx, setDragFromIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+
   const set = (patch: Partial<CameraViewSettings>) => onCamViewChange(patch)
   const reset = () => onCamViewChange({ ...DEFAULT_CAM_VIEW })
+
+  const handleDragStart = (idx: number) => (e: React.DragEvent) => {
+    setDragFromIdx(idx)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (idx: number) => (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverIdx(idx)
+  }
+
+  const handleDrop = (idx: number) => (e: React.DragEvent) => {
+    e.preventDefault()
+    if (dragFromIdx !== null && dragFromIdx !== idx) {
+      onReorderCameras(dragFromIdx, idx)
+    }
+    setDragFromIdx(null)
+    setDragOverIdx(null)
+  }
+
+  const handleAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!addDeviceId.trim()) return
+    onAddCamera(addLabel, addDeviceId)
+    setAddLabel('')
+    setAddDeviceId('')
+    setShowAddForm(false)
+  }
 
   return (
     <div className="panel camera-panel">
@@ -122,6 +157,12 @@ export function CameraPanel({
               title="Camera settings"
             >⚙️</button>
           )}
+          <button
+            type="button"
+            className={`btn btn--icon ${showAddForm ? 'btn--active' : ''}`}
+            onClick={() => setShowAddForm(s => !s)}
+            title="Add camera manually"
+          >＋</button>
           <button type="button" className="btn btn--icon" onClick={onRefresh} title="Refresh cameras" disabled={isLoading}>
             {isLoading ? '⟳' : '↺'}
           </button>
@@ -139,16 +180,53 @@ export function CameraPanel({
         )}
         {isLoading && <div className="empty-state"><div className="spinner" /><p>Detecting cameras...</p></div>}
 
-        <div className="camera-list">
-          {cameras.map(camera => (
+        {/* ── Add Camera Form ── */}
+        {showAddForm && (
+          <form className="add-camera-form" onSubmit={handleAddSubmit}>
+            <div className="add-camera-form__row">
+              <input
+                className="add-camera-form__input"
+                type="text"
+                placeholder="Label (optional)"
+                value={addLabel}
+                onChange={e => setAddLabel(e.target.value)}
+              />
+            </div>
+            <div className="add-camera-form__row">
+              <input
+                className="add-camera-form__input"
+                type="text"
+                placeholder="Device ID *"
+                value={addDeviceId}
+                onChange={e => setAddDeviceId(e.target.value)}
+                required
+              />
+            </div>
+            <div className="add-camera-form__actions">
+              <button type="submit" className="btn btn--primary btn--sm" disabled={!addDeviceId.trim()}>Add</button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowAddForm(false)}>Cancel</button>
+            </div>
+          </form>
+        )}
+
+        <div
+          className="camera-list"
+          onDragLeave={() => setDragOverIdx(null)}
+          onDragEnd={() => { setDragFromIdx(null); setDragOverIdx(null) }}
+        >
+          {cameras.map((camera, idx) => (
             <CameraPreview
               key={camera.id}
               camera={camera}
               isActive={activeCamera?.id === camera.id}
               isDisconnected={disconnectedIds.has(camera.deviceId)}
               activeStream={activeCamera?.id === camera.id ? activeCameraStream : null}
+              isDragOver={dragOverIdx === idx}
               onClick={() => onSelectCamera(camera)}
               onRemove={e => { e.stopPropagation(); onRemoveCamera(camera.deviceId) }}
+              onDragStart={handleDragStart(idx)}
+              onDragOver={handleDragOver(idx)}
+              onDrop={handleDrop(idx)}
             />
           ))}
         </div>

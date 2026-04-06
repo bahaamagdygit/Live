@@ -420,6 +420,58 @@
   background: rgba(255, 68, 68, 0.12);
 }
 
+/* Drag handle */
+.camera-card__drag-handle {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  transform: translateY(-50%);
+  color: #555;
+  font-size: 14px;
+  cursor: grab;
+  line-height: 1;
+  -webkit-user-select: none;
+  user-select: none;
+  padding: 2px;
+}
+.camera-card__drag-handle:active { cursor: grabbing; }
+.camera-card { position: relative; padding-left: 20px; }
+
+/* Drag-over highlight */
+.camera-card--drag-over {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 2px rgba(200, 16, 46, 0.4) !important;
+}
+
+/* Add camera form */
+.add-camera-form {
+  background: var(--color-bg-medium);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.add-camera-form__row { display: flex; }
+.add-camera-form__input {
+  flex: 1;
+  background: var(--color-bg-dark);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+}
+.add-camera-form__input:focus { border-color: var(--color-accent); }
+.add-camera-form__actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .camera-status {
   display: flex;
   align-items: center;

@@ -36,6 +36,8 @@ interface UseCamerasReturn {
   selectCamera: (camera: Camera) => Promise<void>
   refreshCameras: () => Promise<void>
   removeCamera: (deviceId: string) => void
+  reorderCameras: (from: number, to: number) => void
+  addCamera: (label: string, deviceId: string) => void
   cameraError: string | null
   isLoading: boolean
   camView: CameraViewSettings
@@ -239,6 +241,24 @@ export function useCameras(): UseCamerasReturn {
     [selectCameraById, camViewMap]
   )
 
+  const reorderCameras = useCallback((from: number, to: number) => {
+    setCameras(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+  }, [])
+
+  const addCamera = useCallback((label: string, deviceId: string) => {
+    const trimId = deviceId.trim()
+    const trimLabel = label.trim() || `Camera (${trimId.slice(0, 8)})`
+    setCameras(prev => {
+      if (prev.some(c => c.deviceId === trimId)) return prev
+      return [...prev, { id: trimId, label: trimLabel, deviceId: trimId }]
+    })
+  }, [])
+
   useEffect(() => {
     refreshCameras()
     navigator.mediaDevices.addEventListener('devicechange', refreshCameras)
@@ -255,6 +275,8 @@ export function useCameras(): UseCamerasReturn {
     selectCamera,
     refreshCameras,
     removeCamera,
+    reorderCameras,
+    addCamera,
     cameraError,
     isLoading,
     camView,
