@@ -591,53 +591,86 @@ function App() {
           />
         </div>
 
-        {/* Right: PowerPoint only */}
+        {/* Right: File Library + Presentation controls */}
         <div className="app-main__right">
-          <div className="panel pptx-launcher">
+          <div className="panel file-library">
             <div className="panel__header">
               <h3 className="panel__title">
-                <span className="panel__title-icon">📊</span>
-                PowerPoint
+                <span className="panel__title-icon">📂</span>
+                Presentations
               </h3>
+              <div className="panel__header-actions">
+                <button
+                  type="button"
+                  className="btn btn--icon btn--sm"
+                  title="Add files"
+                  onClick={slides.addFiles}
+                >＋ Add</button>
+              </div>
             </div>
-            <div className="pptx-launcher__body">
-              {slides.pptxFileName ? (
-                <div className="pptx-launcher__loaded">
-                  <div className="pptx-launcher__file-icon">
-                    {slides.fileType === 'pdf' ? '📕' :
-                      slides.fileType === 'docx' || slides.fileType === 'doc' ? '📝' :
-                        slides.fileType === 'xlsx' || slides.fileType === 'xls' ? '📊' :
-                          '📊'}
-                  </div>
-                  <div className="pptx-launcher__file-name" title={slides.pptxFileName}>
-                    {slides.pptxFileName}
-                  </div>
-                  <div className="pptx-launcher__count">{slides.slides.length} slides</div>
-                  <div className="pptx-launcher__current">
-                    Slide {slides.currentSlideIndex + 1} / {slides.slides.length}
-                  </div>
+
+            <div className="panel__content file-library__content">
+              {slides.fileLibrary.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-state__icon">📄</div>
+                  <p>No files loaded</p>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm"
+                    onClick={slides.addFiles}
+                  >Add Files</button>
                 </div>
               ) : (
-                <div className="pptx-launcher__empty">
-                  <div className="pptx-launcher__empty-icon">📊</div>
-                  <p>No presentation loaded</p>
+                <div className="file-library__list">
+                  {slides.fileLibrary.map(f => {
+                    const isActive = f.id === slides.activeFileId
+                    const icon = f.fileType === 'pdf' ? '📕'
+                      : f.fileType === 'docx' || f.fileType === 'doc' ? '📝'
+                      : f.fileType === 'xlsx' || f.fileType === 'xls' ? '📊'
+                      : '📊'
+                    return (
+                      <div
+                        key={f.id}
+                        className={`file-library__item ${isActive ? 'file-library__item--active' : ''}`}
+                        onClick={() => slides.selectFile(f.id)}
+                        title={f.fileName}
+                      >
+                        <span className="file-library__icon">{icon}</span>
+                        <div className="file-library__info">
+                          <span className="file-library__name">{f.fileName}</span>
+                          <span className="file-library__meta">{f.slides.length} slides</span>
+                        </div>
+                        {isActive && (
+                          <span className="file-library__active-badge">Active</span>
+                        )}
+                        <button
+                          type="button"
+                          className="file-library__remove"
+                          title="Remove"
+                          onClick={e => { e.stopPropagation(); slides.removeFile(f.id) }}
+                        >×</button>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
 
+              {slides.activeFile && (
+                <div className="file-library__current-info">
+                  <span className="file-library__current-label">
+                    Slide {slides.currentSlideIndex + 1} / {slides.slides.length}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="panel__footer file-library__footer">
               <button
                 type="button"
                 className={`pptx-launcher__btn ${isPptxControllerOpen ? 'pptx-launcher__btn--open' : ''}`}
                 onClick={handleTogglePptxController}
               >
-                {isPptxControllerOpen ? '✕ Close Controller' : '🖥 Open Controller'}
-              </button>
-
-              <button
-                type="button"
-                className="pptx-launcher__btn pptx-launcher__btn--secondary"
-                onClick={slides.openPptx}
-              >
-                📂 Open File
+                {isPptxControllerOpen ? '✕ Close Controller' : '🖥 Controller'}
               </button>
 
               {!isPresentationOpen && displays.length > 1 && (
@@ -662,7 +695,6 @@ function App() {
               </button>
             </div>
           </div>
-
         </div>
       </main>
 

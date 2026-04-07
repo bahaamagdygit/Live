@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('electronAPI', {
   getCameras: () => ipcRenderer.invoke('get-cameras'),
   openPptx: () => ipcRenderer.invoke('open-pptx'),
+  openMultiplePptx: () => ipcRenderer.invoke('open-multiple-pptx'),
   startStream: (config: any) => ipcRenderer.invoke('start-stream', config),
   stopStream: () => ipcRenderer.invoke('stop-stream'),
   startRecording: (config: any) => ipcRenderer.invoke('start-recording', config),

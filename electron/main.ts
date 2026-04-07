@@ -307,6 +307,43 @@ ipcMain.handle('open-pptx', async () => {
   }
 })
 
+ipcMain.handle('open-multiple-pptx', async () => {
+  if (!mainWindow) return { success: false, error: 'No window' }
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Open Documents',
+    filters: [
+      { name: 'All Supported Files', extensions: ['pptx', 'ppt', 'pdf', 'docx', 'doc', 'xlsx', 'xls', 'odp', 'odt', 'ods'] },
+      { name: 'PowerPoint', extensions: ['pptx', 'ppt'] },
+      { name: 'PDF', extensions: ['pdf'] },
+      { name: 'Word', extensions: ['docx', 'doc'] },
+      { name: 'OpenDocument', extensions: ['odp', 'odt', 'ods'] },
+    ],
+    properties: ['openFile', 'multiSelections'],
+  })
+
+  if (result.canceled || !result.filePaths.length) {
+    return { success: false, canceled: true }
+  }
+
+  const results = await Promise.all(result.filePaths.map(async (filePath) => {
+    const ext = path.extname(filePath).toLowerCase().slice(1)
+    try {
+      let slides: any[] = []
+      if (ext === 'pptx' || ext === 'ppt') slides = await parsePptxSlides(filePath)
+      else if (ext === 'pdf')               slides = await parsePdfFile(filePath)
+      else if (ext === 'docx' || ext === 'doc') slides = await parseWordFile(filePath)
+      else if (['xlsx','xls','odp','odt','ods'].includes(ext)) slides = await parseWithOfficeParser(filePath)
+      else return { success: false, filePath, error: `Unsupported: .${ext}` }
+      return { success: true, slides, filePath, fileType: ext }
+    } catch (err: any) {
+      return { success: false, filePath, error: err.message }
+    }
+  }))
+
+  return { success: true, results }
+})
+
 async function parsePptxSlides(filePath: string): Promise<any[]> {
   const zip = new AdmZip(filePath)
 

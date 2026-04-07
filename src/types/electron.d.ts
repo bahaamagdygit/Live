@@ -7,7 +7,19 @@ interface ElectronAPI {
     canceled?: boolean
     slides?: import('./index').Slide[]
     filePath?: string
+    fileType?: string
     error?: string
+  }>
+  openMultiplePptx: () => Promise<{
+    success: boolean
+    canceled?: boolean
+    results?: Array<{
+      success: boolean
+      slides?: import('./index').Slide[]
+      filePath?: string
+      fileType?: string
+      error?: string
+    }>
   }>
   startStream: (config: any) => Promise<{ success: boolean; error?: string }>
   stopStream: () => Promise<{ success: boolean; error?: string }>
