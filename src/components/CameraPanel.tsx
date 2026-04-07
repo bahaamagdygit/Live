@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Camera } from '../types'
 import { CameraViewSettings, DEFAULT_CAM_VIEW } from '../hooks/useCameras'
+import { CameraSwitchTransition } from './MainPreview'
 
 interface CameraPanelProps {
   cameras: Camera[]
@@ -18,6 +19,8 @@ interface CameraPanelProps {
   manualFallback: boolean
   onToggleManualFallback: () => void
   disconnectedIds: Set<string>
+  switchTransition: CameraSwitchTransition
+  onSwitchTransitionChange: (t: CameraSwitchTransition) => void
 }
 
 function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragOver, onClick, onRemove, onDragStart, onDragOver, onDrop }: {
@@ -95,6 +98,7 @@ export function CameraPanel({
   onReorderCameras, onAddCamera,
   isLoading, error, camView, onCamViewChange,
   manualFallback, onToggleManualFallback, disconnectedIds,
+  switchTransition, onSwitchTransitionChange,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -140,7 +144,6 @@ export function CameraPanel({
       <div className="panel__header">
         <h3 className="panel__title">
           <span className="panel__title-icon">🎥</span>
-          Cameras
         </h3>
         <div className="panel__header-actions">
           <button
@@ -318,6 +321,20 @@ export function CameraPanel({
                 <button type="button"
                   className={`cam-settings__flip ${camView.flipV ? 'cam-settings__flip--on' : ''}`}
                   onClick={() => set({ flipV: !camView.flipV })}>↕ Vert</button>
+              </div>
+            </div>
+
+            <div className="cam-settings__row">
+              <label className="cam-settings__label">Switch Effect</label>
+              <div className="cam-settings__flip-btns">
+                {(['fade', 'zoom', 'slide-left', 'slide-right', 'none'] as CameraSwitchTransition[]).map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`cam-settings__flip ${switchTransition === t ? 'cam-settings__flip--on' : ''}`}
+                    onClick={() => onSwitchTransitionChange(t)}
+                  >{t === 'slide-left' ? '← Slide' : t === 'slide-right' ? '→ Slide' : t.charAt(0).toUpperCase() + t.slice(1)}</button>
+                ))}
               </div>
             </div>
 

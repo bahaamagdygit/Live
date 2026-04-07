@@ -3,12 +3,15 @@ import { OverlaySettings, LogoSettings, CameraFallbackSettings } from '../types'
 import { ChurchBorderOverlay } from '../presentation/PresentationApp'
 import '../presentation/presentation.css'
 
+export type CameraSwitchTransition = 'fade' | 'zoom' | 'slide-left' | 'slide-right' | 'none'
+
 interface MainPreviewProps {
   cameraDeviceId: string
   overlaySettings: OverlaySettings
   logoSettings: LogoSettings
   cameraFallback: CameraFallbackSettings
   manualFallback?: boolean
+  switchTransition?: CameraSwitchTransition
   camView?: {
     scale: number
     offsetX: number
@@ -45,6 +48,7 @@ export function MainPreview({
   logoSettings,
   cameraFallback,
   manualFallback = false,
+  switchTransition = 'zoom',
   camView,
   videoElMountRef,
 }: MainPreviewProps) {
@@ -54,6 +58,8 @@ export function MainPreview({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [previewSize, setPreviewSize] = useState({ w: 960, h: 540 })
   const [cameraFailed, setCameraFailed] = useState(false)
+  const [isSwitching, setIsSwitching] = useState(false)
+  const prevDeviceIdRef = useRef(cameraDeviceId)
 
   // Observe container size for scaling
   useEffect(() => {
@@ -70,6 +76,11 @@ export function MainPreview({
   useEffect(() => {
     const deviceId = cameraDeviceId
     if (!deviceId) { setCameraFailed(true); return }
+
+    // Trigger switch-out animation when camera changes (not on first mount)
+    const isSwitch = prevDeviceIdRef.current !== deviceId && prevDeviceIdRef.current !== ''
+    prevDeviceIdRef.current = deviceId
+    if (isSwitch && switchTransition !== 'none') setIsSwitching(true)
 
     let stopped = false
     let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -144,7 +155,12 @@ export function MainPreview({
       })
       const video = cameraVideoRef.current
       if (video) {
-        const onPlaying = () => { video.removeEventListener('playing', onPlaying); startBrightnessCheck() }
+        const onPlaying = () => {
+          video.removeEventListener('playing', onPlaying)
+          startBrightnessCheck()
+          // Fade back in after new stream starts playing
+          setIsSwitching(false)
+        }
         video.addEventListener('playing', onPlaying)
       }
     }
@@ -196,11 +212,17 @@ export function MainPreview({
         {/* Camera feed */}
         <video
           ref={cameraVideoRef}
-          className="presentation-camera"
+          className={[
+            'presentation-camera',
+            switchTransition !== 'none' ? `presentation-camera--switch-${switchTransition}` : '',
+            isSwitching ? 'presentation-camera--switching-out' : '',
+          ].filter(Boolean).join(' ')}
           autoPlay playsInline muted
           style={{
             objectFit: fit,
-            transform: `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
+            transform: isSwitching
+              ? undefined  // CSS class handles the transition transform
+              : `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
             transformOrigin: 'center center',
             filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
             display: !showFallback ? 'block' : 'none',

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { CameraPanel } from './components/CameraPanel'
-import { MainPreview } from './components/MainPreview'
+import { MainPreview, CameraSwitchTransition } from './components/MainPreview'
 import { TextControls } from './components/TextControls'
 import { StreamControls } from './components/StreamControls'
 import { SettingsModal } from './components/SettingsModal'
@@ -79,6 +79,7 @@ function App() {
   const [logoSettings, setLogoSettings] = useState<LogoSettings>(DEFAULT_SETTINGS.logoSettings)
   const [cameraFallback, setCameraFallback] = useState<CameraFallbackSettings>(DEFAULT_SETTINGS.cameraFallback)
   const [manualFallback, setManualFallback] = useState(false)
+  const [switchTransition, setSwitchTransition] = useState<CameraSwitchTransition>('zoom')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [isPresentationOpen, setIsPresentationOpen] = useState(false)
@@ -562,6 +563,8 @@ function App() {
             manualFallback={manualFallback}
             onToggleManualFallback={() => setManualFallback(v => !v)}
             disconnectedIds={cameras.disconnectedIds}
+            switchTransition={switchTransition}
+            onSwitchTransitionChange={setSwitchTransition}
           />
           <VideoOverlayWidget onReady={handleVideoReady} />
         </div>
@@ -574,6 +577,7 @@ function App() {
             logoSettings={logoSettings}
             cameraFallback={cameraFallback}
             manualFallback={manualFallback}
+            switchTransition={switchTransition}
             camView={cameras.camView}
             videoElMountRef={videoElMountRef}
           />
