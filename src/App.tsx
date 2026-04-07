@@ -8,7 +8,7 @@ import { VideoOverlayWidget } from './components/VideoOverlayWidget'
 import { useCameras } from './hooks/useCameras'
 import { useStream } from './hooks/useStream'
 import { useSlides } from './hooks/useSlides'
-import { AppSettings, OverlaySettings, LogoSettings, CameraFallbackSettings } from './types'
+import { AppSettings, OverlaySettings, LogoSettings, CameraFallbackSettings, VideoOverlaySettings } from './types'
 import './App.css'
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -84,6 +84,7 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [isPresentationOpen, setIsPresentationOpen] = useState(false)
   const [isPptxControllerOpen, setIsPptxControllerOpen] = useState(false)
+  const [isVideoOverlayOpen, setIsVideoOverlayOpen] = useState(false)
   const [displays, setDisplays] = useState<{ id: number; label: string }[]>([])
   const [selectedDisplayId, setSelectedDisplayId] = useState<number | undefined>(undefined)
 
@@ -93,9 +94,17 @@ function App() {
   // Stable ref — VideoOverlayWidget calls onReady(setVideoEl) once on mount.
   // Storing it in a ref means no re-render when it's set.
   const videoElMountRef = useRef<((el: HTMLVideoElement | null) => void) | undefined>(undefined)
-  const handleVideoReady = useCallback((setVideoEl: (el: HTMLVideoElement | null) => void) => {
+  const videoUpdateSettingsRef = useRef<((patch: Partial<VideoOverlaySettings>) => void) | null>(null)
+  const handleVideoReady = useCallback((
+    setVideoEl: (el: HTMLVideoElement | null) => void,
+    updateSettings: (patch: Partial<VideoOverlaySettings>) => void
+  ) => {
     videoElMountRef.current = setVideoEl
+    videoUpdateSettingsRef.current = updateSettings
   }, [])
+
+  // Quick video controls surfaced to the toolbar
+  const [videoQuick, setVideoQuick] = useState({ visible: false, opacity: 1, hasActive: false })
 
   // Load settings on startup
   useEffect(() => {
@@ -545,7 +554,7 @@ function App() {
 
       {/* Main content area */}
       <main className="app-main">
-        {/* Left: Camera Panel + Video Overlay Panel */}
+        {/* Left: Camera Panel only */}
         <div className="app-main__left">
           <CameraPanel
             cameras={cameras.cameras}
@@ -566,7 +575,6 @@ function App() {
             switchTransition={switchTransition}
             onSwitchTransitionChange={setSwitchTransition}
           />
-          <VideoOverlayWidget onReady={handleVideoReady} />
         </div>
 
         {/* Center: Main Preview */}
@@ -583,7 +591,7 @@ function App() {
           />
         </div>
 
-        {/* Right: Camera controls + PowerPoint controller launcher */}
+        {/* Right: PowerPoint only */}
         <div className="app-main__right">
           <div className="panel pptx-launcher">
             <div className="panel__header">
@@ -685,8 +693,43 @@ function App() {
         onStopRecording={stream.stopRecording}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenPptx={slides.openPptx}
+        onOpenVideoOverlay={() => setIsVideoOverlayOpen(true)}
         formatDuration={stream.formatDuration}
+        videoVisible={videoQuick.visible}
+        videoOpacity={videoQuick.opacity}
+        videoHasActive={videoQuick.hasActive}
+        onVideoToggleVisible={() => {
+          const next = !videoQuick.visible
+          setVideoQuick(prev => ({ ...prev, visible: next }))
+          videoUpdateSettingsRef.current?.({ visible: next })
+        }}
+        onVideoOpacityChange={opacity => {
+          setVideoQuick(prev => ({ ...prev, opacity }))
+          videoUpdateSettingsRef.current?.({ opacity })
+        }}
       />
+
+      {/* Video Overlay — always mounted, shown as popup or hidden */}
+      <div className={isVideoOverlayOpen ? 'vo-popup-backdrop' : 'vo-hidden-mount'}
+        onClick={isVideoOverlayOpen ? () => setIsVideoOverlayOpen(false) : undefined}
+      >
+        <div className={isVideoOverlayOpen ? 'vo-popup' : ''} onClick={e => e.stopPropagation()}>
+          {isVideoOverlayOpen && (
+            <button
+              type="button"
+              className="vo-popup__close"
+              onClick={() => setIsVideoOverlayOpen(false)}
+              title="Close"
+            >✕</button>
+          )}
+          <VideoOverlayWidget
+            onReady={handleVideoReady}
+            onQuickUpdate={(visible, opacity, hasActive) =>
+              setVideoQuick({ visible, opacity, hasActive })
+            }
+          />
+        </div>
+      </div>
 
       {/* Settings Modal */}
       <SettingsModal

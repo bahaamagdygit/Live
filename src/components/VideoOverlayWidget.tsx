@@ -5,20 +5,33 @@
  * never re-render App or MainPreview. The only bridge to the outside world is
  * the stable `setVideoEl` callback ref, exposed via `onReady` once on mount.
  */
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useVideoOverlay } from '../hooks/useVideoOverlay'
 import { VideoOverlayPanel } from './VideoOverlayPanel'
 
 interface VideoOverlayWidgetProps {
-  /** Called once on mount with the stable setVideoEl fn — App stores it in a ref */
-  onReady: (setVideoEl: (el: HTMLVideoElement | null) => void) => void
+  onReady: (
+    setVideoEl: (el: HTMLVideoElement | null) => void,
+    updateSettings: (patch: Partial<import('../types').VideoOverlaySettings>) => void
+  ) => void
+  onQuickUpdate?: (visible: boolean, opacity: number, hasActive: boolean) => void
 }
 
-export function VideoOverlayWidget({ onReady }: VideoOverlayWidgetProps) {
+export function VideoOverlayWidget({ onReady, onQuickUpdate }: VideoOverlayWidgetProps) {
   const vo = useVideoOverlay()
+  const prevQuickRef = useRef('')
 
-  // Give App the stable setVideoEl once — onReady is stable (useCallback in App)
-  useEffect(() => { onReady(vo.setVideoEl) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onReady(vo.setVideoEl, vo.updateSettings) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Notify App of quick-control values only when they actually change
+  useEffect(() => {
+    if (!onQuickUpdate) return
+    const hasActive = vo.settings.activeId !== null
+    const key = `${vo.settings.visible}|${vo.settings.opacity}|${hasActive}`
+    if (key === prevQuickRef.current) return
+    prevQuickRef.current = key
+    onQuickUpdate(vo.settings.visible, vo.settings.opacity, hasActive)
+  }, [vo.settings.visible, vo.settings.opacity, vo.settings.activeId, onQuickUpdate])
 
   return (
     <VideoOverlayPanel

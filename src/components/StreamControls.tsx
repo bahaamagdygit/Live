@@ -14,7 +14,14 @@ interface StreamControlsProps {
   onStopRecording: () => void
   onOpenSettings: () => void
   onOpenPptx: () => void
+  onOpenVideoOverlay: () => void
   formatDuration: (s: number) => string
+  // quick video overlay controls
+  videoVisible: boolean
+  videoOpacity: number
+  videoHasActive: boolean
+  onVideoToggleVisible: () => void
+  onVideoOpacityChange: (v: number) => void
 }
 
 export function StreamControls({
@@ -30,7 +37,13 @@ export function StreamControls({
   onStopRecording,
   onOpenSettings,
   onOpenPptx,
+  onOpenVideoOverlay,
   formatDuration,
+  videoVisible,
+  videoOpacity,
+  videoHasActive,
+  onVideoToggleVisible,
+  onVideoOpacityChange,
 }: StreamControlsProps) {
   const isLive = streamStatus === 'live'
   const isConnecting = streamStatus === 'connecting'
@@ -64,6 +77,45 @@ export function StreamControls({
             <span className="btn-icon">📄</span>
             <span className="btn-label">Open File</span>
           </button>
+
+          <div className="video-quick-controls">
+            <button
+              type="button"
+              className="btn btn--icon btn--toolbar"
+              onClick={onOpenVideoOverlay}
+              title="Video Overlay settings"
+            >
+              <span className="btn-icon">🎬</span>
+              <span className="btn-label">Video</span>
+            </button>
+
+            {videoHasActive && (
+              <>
+                <button
+                  type="button"
+                  className={`btn btn--icon btn--toolbar video-quick-controls__eye ${videoVisible ? 'video-quick-controls__eye--on' : ''}`}
+                  onClick={onVideoToggleVisible}
+                  title={videoVisible ? 'Hide video overlay' : 'Show video overlay'}
+                >
+                  <span className="btn-icon">{videoVisible ? '👁' : '🚫'}</span>
+                  <span className="btn-label">{videoVisible ? 'Visible' : 'Hidden'}</span>
+                </button>
+
+                <div className="video-quick-controls__opacity">
+                  <span className="video-quick-controls__label">Opacity</span>
+                  <input
+                    type="range"
+                    min={0} max={1} step={0.01}
+                    value={videoOpacity}
+                    onChange={e => onVideoOpacityChange(Number(e.target.value))}
+                    title={`Opacity: ${Math.round(videoOpacity * 100)}%`}
+                    className="video-quick-controls__slider"
+                  />
+                  <span className="video-quick-controls__value">{Math.round(videoOpacity * 100)}%</span>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Center: camera + quality info */}
