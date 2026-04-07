@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 
 interface PresentationData {
   text: string
+  langs?: string[]
   visible: boolean
   position: 'bottom' | 'center' | 'top'
   fontSize: number
@@ -409,6 +410,7 @@ export default function PresentationApp() {
           panelLayout={data.panelLayout || 'full'}
           panelWidth={data.panelWidth ?? 100}
           panelHeight={data.panelHeight ?? 20}
+          langs={data.langs}
         />
 
         {/* Slide counter (bottom right) */}
@@ -487,7 +489,8 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
   line1Bold, line2Bold,
   line2FontSize, line2FontFamily, line2TextColor,
   logoBase64, logoPosition, logoSize, logoOpacity, logoVisible, logoAnimation,
-  panelLayout = 'full', panelWidth = 100, panelHeight = 20 }: {
+  panelLayout = 'full', panelWidth = 100, panelHeight = 20,
+  langs = [] }: {
     line1: string; line2: string; visible: boolean;
     fontSize: number; fontFamily: string; textColor: string; alignment: string;
     line1Bold: boolean; line2Bold: boolean;
@@ -497,6 +500,7 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
     panelLayout?: 'full' | 'left' | 'right';
     panelWidth?: number;
     panelHeight?: number;
+    langs?: string[];
   }) {
   const particlesRef = useRef<HTMLDivElement>(null)
   const panelBodyRef = useRef<HTMLDivElement>(null)
@@ -992,22 +996,30 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
             </svg>
           </div>
           <div ref={panelBodyRef} className="church-reading-body">
-            {visible && line1 && (
-              <div
-                ref={line1Ref}
-                className="church-reading-line1"
-                dir={isRtl(line1) ? 'rtl' : 'ltr'}
-                style={{
-                  fontSize: `${fontSize}px`,
-                  fontFamily,
-                  color: textColor,
-                  textAlign: alignment as any,
-                  fontWeight: line1Bold ? 'bold' : 'normal',
-                  wordBreak: 'break-word',
-                  overflowWrap: 'break-word',
-                }}
-              >{line1}</div>
-            )}
+            {visible && line1 && (() => {
+              const script1 = resolveScriptClass(line1, langs[0])
+              const isCoptic1 = script1 === 'coptic'
+              const effectiveFont1 = isCoptic1
+                ? '"Noto Sans Coptic", "Antinoou", "New Athena Unicode", serif'
+                : fontFamily
+              return (
+                <div
+                  ref={line1Ref}
+                  className={`church-reading-line1 church-reading--${script1}`}
+                  dir={script1 === 'arabic' ? 'rtl' : 'ltr'}
+                  lang={script1 === 'coptic' ? 'cop' : script1 === 'arabic' ? 'ar' : 'en'}
+                  style={{
+                    fontSize: `${fontSize}px`,
+                    fontFamily: effectiveFont1,
+                    color: textColor,
+                    textAlign: alignment as any,
+                    fontWeight: line1Bold ? 'bold' : 'normal',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                  }}
+                >{line1}</div>
+              )
+            })()}
             {visible && line1 && line2 && (
               <div className="church-reading-divider">
                 <div className="church-reading-divider-line" />
@@ -1015,22 +1027,30 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
                 <div className="church-reading-divider-line" />
               </div>
             )}
-            {visible && line2 && (
-              <div
-                ref={line2Ref}
-                className="church-reading-line2"
-                dir={isRtl(line2) ? 'rtl' : 'ltr'}
-                style={{
-                  fontSize: `${Math.max(13, Math.round(fontSize * 0.6))}px`,
-                  fontFamily: line2FontFamily ?? fontFamily,
-                  color: line2TextColor ?? textColor,
-                  textAlign: alignment as any,
-                  fontWeight: line2Bold ? 'bold' : 'normal',
-                  wordBreak: 'break-word',
-                  overflowWrap: 'break-word',
-                }}
-              >{line2}</div>
-            )}
+            {visible && line2 && (() => {
+              const script2 = resolveScriptClass(line2, langs[1])
+              const isCoptic2 = script2 === 'coptic'
+              const effectiveFont2 = isCoptic2
+                ? '"Noto Sans Coptic", "Antinoou", "New Athena Unicode", serif'
+                : (line2FontFamily ?? fontFamily)
+              return (
+                <div
+                  ref={line2Ref}
+                  className={`church-reading-line2 church-reading--${script2}`}
+                  dir={script2 === 'arabic' ? 'rtl' : 'ltr'}
+                  lang={script2 === 'coptic' ? 'cop' : script2 === 'arabic' ? 'ar' : 'en'}
+                  style={{
+                    fontSize: `${Math.max(13, Math.round(fontSize * 0.6))}px`,
+                    fontFamily: effectiveFont2,
+                    color: line2TextColor ?? textColor,
+                    textAlign: alignment as any,
+                    fontWeight: line2Bold ? 'bold' : 'normal',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                  }}
+                >{line2}</div>
+              )
+            })()}
           </div>
         </div>
       </div>
@@ -1048,6 +1068,18 @@ function hexToRgb(hex: string) {
 
 function isRtl(text: string) {
   if (!text) return false
-  const rtlChars = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/
-  return rtlChars.test(text)
+  return /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(text)
+}
+
+// Coptic Unicode block U+2C80–U+2CFF
+function isCoptic(text: string) {
+  if (!text) return false
+  return /[\u2C80-\u2CFF]/.test(text)
+}
+
+// Resolve language class for a text line, optionally using parser-supplied hint
+function resolveScriptClass(text: string, langHint?: string): 'coptic' | 'arabic' | 'english' {
+  if (langHint === 'coptic' || isCoptic(text)) return 'coptic'
+  if (langHint === 'arabic' || isRtl(text)) return 'arabic'
+  return 'english'
 }

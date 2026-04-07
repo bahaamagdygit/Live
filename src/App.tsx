@@ -267,10 +267,11 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [slides.nextSlide, slides.prevSlide])
 
-  // Sync overlay text with current slide
+  // Sync overlay text + langs with current slide
   useEffect(() => {
     const text = slides.getCurrentText()
-    setOverlaySettings((prev) => ({ ...prev, text }))
+    const langs = slides.getCurrentLangs()
+    setOverlaySettings((prev) => ({ ...prev, text, langs }))
   }, [slides.currentSlideIndex, slides.slides])
 
   // Listen for presentation window being closed externally

@@ -360,21 +360,45 @@ async function parsePptxSlides(filePath: string): Promise<any[]> {
       return numA - numB
     })
 
+  // Known Coptic font name patterns (CS fonts, Coptic Unicode fonts, etc.)
+  const COPTIC_FONT_RE = /cs\s*avva|cs\s*shenouda|cs\s*new\s*athena|coptic\s*unicode|new\s*athena\s*unicode|antinoou|cs\s*pishoi|cs\s*coptic|coptic\b/i
+
+  // Coptic Unicode block U+2C80–U+2CFF and supplemental Coptic U+102E0–U+102FF
+  const COPTIC_CHAR_RE = /[\u2C80-\u2CFF\u{102E0}-\u{102FF}]/u
+
+  function detectParaLang(paraXml: string): 'coptic' | 'arabic' | 'english' {
+    // Check font name on run properties <a:rPr> or paragraph props
+    const fontMatches = paraXml.match(/(?:typeface|panose|pitchFamily)="([^"]+)"/g) || []
+    for (const fm of fontMatches) {
+      const val = fm.replace(/.*="/, '').replace(/"$/, '')
+      if (COPTIC_FONT_RE.test(val)) return 'coptic'
+    }
+    // Check the text content for Coptic Unicode characters
+    const textContent = paraXml.replace(/<[^>]+>/g, '')
+    if (COPTIC_CHAR_RE.test(textContent)) return 'coptic'
+    // Arabic Unicode block
+    if (/[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(textContent)) return 'arabic'
+    return 'english'
+  }
+
   const slides = slideEntries.map((entry: any, idx: number) => {
     const xml = entry.getData().toString('utf8')
 
-    // Extract paragraphs (<a:p>), then join all runs (<a:t>) within each paragraph.
-    // This prevents a single sentence split across multiple runs from becoming multiple lines.
+    // Extract paragraphs (<a:p>), preserving lang info per paragraph
     const paragraphMatches = xml.match(/<a:p[ >][\s\S]*?<\/a:p>/g) || []
-    const texts = paragraphMatches
-      .map((para: string) => {
-        const runMatches = para.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || []
-        return runMatches
-          .map((r: string) => r.replace(/<[^>]+>/g, ''))
-          .join('')
-          .trim()
-      })
-      .filter((t: string) => t.length > 0)
+    const textLines: string[] = []
+    const langs: string[] = []
+
+    for (const para of paragraphMatches) {
+      const runMatches = para.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || []
+      const text = runMatches
+        .map((r: string) => r.replace(/<[^>]+>/g, ''))
+        .join('')
+        .trim()
+      if (!text) continue
+      textLines.push(text)
+      langs.push(detectParaLang(para))
+    }
 
     const slideNum = idx + 1
     let sectionName = sections.length > 0 ? sections[0].name : 'General'
@@ -385,7 +409,8 @@ async function parsePptxSlides(filePath: string): Promise<any[]> {
 
     return {
       index: idx,
-      text: texts,
+      text: textLines,
+      langs,
       slideNumber: slideNum,
       section: sectionName,
     }

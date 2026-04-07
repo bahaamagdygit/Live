@@ -15,6 +15,7 @@ import '@fontsource/noto-kufi-arabic/400.css'
 import '@fontsource/noto-kufi-arabic/700.css'
 import '@fontsource/amiri/400.css'
 import '@fontsource/amiri/700.css'
+import '@fontsource/noto-sans-coptic/400.css'
 
 const root = document.getElementById('presentation-root')!
 createRoot(root).render(

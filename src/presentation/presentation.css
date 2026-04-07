@@ -411,6 +411,7 @@
 .church-panel-side--left  { left: 0; }
 .church-panel-side--right { right: 0; }
 .church-panel-side--right svg { transform: scaleX(-1); }
+
 .church-reading-arabic,
 .church-reading-line1 {
   font-family: 'Amiri', 'Traditional Arabic', 'Georgia', serif;
@@ -425,6 +426,46 @@
   white-space: normal;
   word-break: keep-all;
   overflow-wrap: break-word;
+}
+
+/* ── Coptic script overrides ─────────────────────────────────────────────── */
+/* Applied via className="church-reading--coptic" alongside line1/line2 */
+.church-reading--coptic {
+  font-family: 'Noto Sans Coptic', 'Antinoou', 'New Athena Unicode',
+               'Segoe UI Historic', 'Segoe UI Symbol', serif !important;
+  /* Coptic glyphs are upright — no italics, generous line-height */
+  font-style: normal;
+  line-height: 1.7 !important;
+  /* Coptic text is LTR and benefits from slightly wider letter spacing */
+  letter-spacing: 1.5px !important;
+  /* Slightly larger to compensate for smaller x-height of Coptic glyphs */
+  word-break: keep-all;
+}
+
+/* Coptic as line1 inherits the gold glow but with adjusted spacing */
+.church-reading-line1.church-reading--coptic {
+  letter-spacing: 2px !important;
+}
+
+/* Coptic as line2 — slightly warmer gold to visually distinguish */
+.church-reading-line2.church-reading--coptic {
+  color: #e8c96a !important;
+  letter-spacing: 1.8px !important;
+}
+
+/* ── Arabic script overrides ─────────────────────────────────────────────── */
+.church-reading--arabic {
+  font-family: 'Amiri', 'Traditional Arabic', 'Scheherazade New',
+               'Arabic Typesetting', serif !important;
+  direction: rtl;
+  letter-spacing: 0 !important; /* Arabic ligatures break with letter-spacing */
+  word-spacing: 2px;
+}
+
+/* ── Latin/English script overrides ─────────────────────────────────────── */
+.church-reading--english {
+  font-family: 'Cinzel', 'Trajan Pro', 'Georgia', serif !important;
+  letter-spacing: 1.2px !important;
 }
 .church-reading-divider {
   display: flex; align-items: center; gap: 14px;

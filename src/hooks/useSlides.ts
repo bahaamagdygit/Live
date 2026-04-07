@@ -31,6 +31,7 @@ interface UseSlidesReturn {
   nextSlide: () => void
   prevSlide: () => void
   getCurrentText: () => string
+  getCurrentLangs: () => string[]
 }
 
 function makeId() {
@@ -166,6 +167,11 @@ export function useSlides(): UseSlidesReturn {
     return (slides[currentSlideIndex]?.text ?? []).join('\n')
   }, [slides, currentSlideIndex])
 
+  const getCurrentLangs = useCallback((): string[] => {
+    if (!slides.length) return []
+    return slides[currentSlideIndex]?.langs ?? []
+  }, [slides, currentSlideIndex])
+
   return {
     fileLibrary,
     activeFileId,
@@ -185,5 +191,6 @@ export function useSlides(): UseSlidesReturn {
     nextSlide,
     prevSlide,
     getCurrentText,
+    getCurrentLangs,
   }
 }

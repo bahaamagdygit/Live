@@ -7,6 +7,7 @@ export interface Camera {
 export interface Slide {
   index: number
   text: string[]
+  langs?: string[]   // per-line language: 'coptic' | 'arabic' | 'english'
   slideNumber?: number
   section?: string
 }
@@ -21,6 +22,7 @@ export interface StreamConfig {
 
 export interface OverlaySettings {
   text: string
+  langs?: string[]   // per-line language hints: 'coptic' | 'arabic' | 'english'
   visible: boolean
   position: 'bottom' | 'center' | 'top'
   fontSize: number

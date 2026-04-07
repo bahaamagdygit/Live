@@ -14,6 +14,7 @@
     "@fontsource/cairo": "^5.2.7",
     "@fontsource/lalezar": "^5.2.7",
     "@fontsource/noto-kufi-arabic": "^5.2.9",
+    "@fontsource/noto-sans-coptic": "^5.2.7",
     "@fontsource/reem-kufi": "^5.2.11",
     "@fontsource/tajawal": "^5.2.7",
     "adm-zip": "^0.5.16",
