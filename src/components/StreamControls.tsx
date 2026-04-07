@@ -20,8 +20,11 @@ interface StreamControlsProps {
   videoVisible: boolean
   videoOpacity: number
   videoHasActive: boolean
+  videoIsPlaying: boolean
   onVideoToggleVisible: () => void
   onVideoOpacityChange: (v: number) => void
+  onVideoPlayPause: () => void
+  onVideoStop: () => void
 }
 
 export function StreamControls({
@@ -42,8 +45,11 @@ export function StreamControls({
   videoVisible,
   videoOpacity,
   videoHasActive,
+  videoIsPlaying,
   onVideoToggleVisible,
   onVideoOpacityChange,
+  onVideoPlayPause,
+  onVideoStop,
 }: StreamControlsProps) {
   const isLive = streamStatus === 'live'
   const isConnecting = streamStatus === 'connecting'
@@ -91,6 +97,26 @@ export function StreamControls({
 
             {videoHasActive && (
               <>
+                <button
+                  type="button"
+                  className="btn btn--icon btn--toolbar"
+                  onClick={onVideoPlayPause}
+                  title={videoIsPlaying ? 'Pause video' : 'Play video'}
+                >
+                  <span className="btn-icon">{videoIsPlaying ? '⏸' : '▶'}</span>
+                  <span className="btn-label">{videoIsPlaying ? 'Pause' : 'Play'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn--icon btn--toolbar"
+                  onClick={onVideoStop}
+                  title="Stop video"
+                >
+                  <span className="btn-icon">⏹</span>
+                  <span className="btn-label">Stop</span>
+                </button>
+
                 <button
                   type="button"
                   className={`btn btn--icon btn--toolbar video-quick-controls__eye ${videoVisible ? 'video-quick-controls__eye--on' : ''}`}

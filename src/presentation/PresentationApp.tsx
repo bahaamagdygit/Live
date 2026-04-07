@@ -76,6 +76,9 @@ function VideoOverlayElement() {
         case 'load':
           el.src     = msg.src
           el.preload = 'auto'
+          el.muted   = true
+          el.volume  = 0
+          el.style.opacity = '0.8'
           el.load()
           break
         case 'play':

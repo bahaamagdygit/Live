@@ -95,16 +95,23 @@ function App() {
   // Storing it in a ref means no re-render when it's set.
   const videoElMountRef = useRef<((el: HTMLVideoElement | null) => void) | undefined>(undefined)
   const videoUpdateSettingsRef = useRef<((patch: Partial<VideoOverlaySettings>) => void) | null>(null)
+  const videoPlayRef  = useRef<(() => void) | null>(null)
+  const videoPauseRef = useRef<(() => void) | null>(null)
+  const videoStopRef  = useRef<(() => void) | null>(null)
   const handleVideoReady = useCallback((
     setVideoEl: (el: HTMLVideoElement | null) => void,
-    updateSettings: (patch: Partial<VideoOverlaySettings>) => void
+    updateSettings: (patch: Partial<VideoOverlaySettings>) => void,
+    controls: { play: () => void; pause: () => void; stop: () => void; getIsPlaying: () => boolean }
   ) => {
     videoElMountRef.current = setVideoEl
     videoUpdateSettingsRef.current = updateSettings
+    videoPlayRef.current  = controls.play
+    videoPauseRef.current = controls.pause
+    videoStopRef.current  = controls.stop
   }, [])
 
   // Quick video controls surfaced to the toolbar
-  const [videoQuick, setVideoQuick] = useState({ visible: false, opacity: 1, hasActive: false })
+  const [videoQuick, setVideoQuick] = useState({ visible: false, opacity: 0.8, hasActive: false, isPlaying: false })
 
   // Load settings on startup
   useEffect(() => {
@@ -731,6 +738,7 @@ function App() {
         videoVisible={videoQuick.visible}
         videoOpacity={videoQuick.opacity}
         videoHasActive={videoQuick.hasActive}
+        videoIsPlaying={videoQuick.isPlaying}
         onVideoToggleVisible={() => {
           const next = !videoQuick.visible
           setVideoQuick(prev => ({ ...prev, visible: next }))
@@ -740,6 +748,11 @@ function App() {
           setVideoQuick(prev => ({ ...prev, opacity }))
           videoUpdateSettingsRef.current?.({ opacity })
         }}
+        onVideoPlayPause={() => {
+          if (videoQuick.isPlaying) videoPauseRef.current?.()
+          else videoPlayRef.current?.()
+        }}
+        onVideoStop={() => videoStopRef.current?.()}
       />
 
       {/* Video Overlay — always mounted, shown as popup or hidden */}
@@ -757,8 +770,8 @@ function App() {
           )}
           <VideoOverlayWidget
             onReady={handleVideoReady}
-            onQuickUpdate={(visible, opacity, hasActive) =>
-              setVideoQuick({ visible, opacity, hasActive })
+            onQuickUpdate={(visible, opacity, hasActive, isPlaying) =>
+              setVideoQuick({ visible, opacity, hasActive, isPlaying })
             }
           />
         </div>

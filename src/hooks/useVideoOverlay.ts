@@ -4,9 +4,9 @@ import { VideoOverlayItem, VideoOverlaySettings } from '../types'
 export const DEFAULT_VIDEO_OVERLAY: VideoOverlaySettings = {
   activeId: null,
   visible: false,
-  opacity: 1,
-  volume: 1,
-  muted: false,
+  opacity: 0.8,
+  volume: 0,
+  muted: true,
   loop: false,
   positionX: 0,
   positionY: 0,
@@ -47,6 +47,11 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
   const settingsRef = useRef(settings)
   const videosRef = useRef(videos)
 
+  // Debounce timers for IPC sync — prevents flooding the IPC channel during
+  // rapid slider changes (opacity, position, volume) from causing lag/stutter.
+  const visualSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const audioSyncTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // ── Direct DOM: apply CSS properties without touching React state ─────────────
   function applyCSS(el: HTMLVideoElement, s: VideoOverlaySettings) {
     el.style.display  = s.visible ? 'block' : 'none'
@@ -58,31 +63,19 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
     el.style.height   = s.maintainAspect ? 'auto' : `${vh}px`
   }
 
-  // ── Load video into element — waits for canplaythrough before resolving ───────
+  // ── Load video into element ───────────────────────────────────────────────────
   function loadVideo(el: HTMLVideoElement, item: VideoOverlayItem, s: VideoOverlaySettings) {
     el.preload = 'auto'
     el.loop    = s.loop
     el.muted   = s.muted
     el.volume  = s.volume
 
-    // Only reload if src actually changed
+    // Only reload if src actually changed — prevents interrupting playback
     const newSrc = item.objectURL
     if (el.src !== newSrc) {
-      console.log('[VideoOverlay] Loading src:', item.name)
       el.src = newSrc
       el.load()
     }
-
-    el.addEventListener('canplaythrough', () => {
-      console.log('[VideoOverlay] canplaythrough — readyState:', el.readyState,
-        '| buffered ranges:', el.buffered.length,
-        '| duration:', el.duration)
-    }, { once: true })
-
-    el.addEventListener('playing', () => {
-      console.log('[VideoOverlay] playing — readyState:', el.readyState,
-        '| currentTime:', el.currentTime)
-    }, { once: true })
   }
 
   // ── Callback ref ─────────────────────────────────────────────────────────────
@@ -105,8 +98,6 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
     elRef.current = el
     if (!el) return
 
-    console.log('[VideoOverlay] Video element mounted')
-
     el.addEventListener('timeupdate',     onTimeUpdate)
     el.addEventListener('durationchange', onDurChange)
     el.addEventListener('play',           onPlayEvt)
@@ -121,6 +112,10 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
     }
     // Apply current CSS directly
     applyCSS(el, s)
+    // Apply audio settings
+    el.volume = s.volume
+    el.muted  = s.muted
+    el.loop   = s.loop
   }, [onTimeUpdate, onDurChange, onPlayEvt, onPauseEvt, onEndedEvt])
 
   // ── When active video changes — load new src ──────────────────────────────────
@@ -137,40 +132,52 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
     }
     loadVideo(el, item, s)
     setIsPlaying(false); setCurrentTime(0)
-    syncToPresentation({ src: item.objectURL, action: 'load' })
+    syncToPresentation({ action: 'load', src: item.objectURL })
   }, [settings.activeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Apply CSS settings directly to DOM (no re-render) ────────────────────────
+  // ── Apply CSS settings directly to DOM — debounced IPC to avoid stutter ──────
   useEffect(() => {
     const el = elRef.current
     if (!el) return
+
+    // Apply CSS immediately (no delay on local display)
     applyCSS(el, settingsRef.current)
-    syncToPresentation({
-      action: 'settings',
-      visible:        settingsRef.current.visible,
-      opacity:        settingsRef.current.opacity,
-      positionX:      settingsRef.current.positionX,
-      positionY:      settingsRef.current.positionY,
-      width:          settingsRef.current.width,
-      height:         settingsRef.current.height,
-      maintainAspect: settingsRef.current.maintainAspect,
-    })
+
+    // Debounce the IPC message — rapid slider drags collapse into one message
+    if (visualSyncTimer.current) clearTimeout(visualSyncTimer.current)
+    visualSyncTimer.current = setTimeout(() => {
+      const s = settingsRef.current
+      syncToPresentation({
+        action:         'settings',
+        visible:        s.visible,
+        opacity:        s.opacity,
+        positionX:      s.positionX,
+        positionY:      s.positionY,
+        width:          s.width,
+        height:         s.height,
+        maintainAspect: s.maintainAspect,
+      })
+      visualSyncTimer.current = null
+    }, 60)
   }, [settings.visible, settings.opacity, settings.positionX, settings.positionY,
       settings.width, settings.height, settings.maintainAspect]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Volume / muted / loop — direct DOM only ───────────────────────────────────
+  // ── Volume / muted / loop — direct DOM only, debounced IPC ───────────────────
   useEffect(() => {
     const el = elRef.current
     if (!el) return
+
+    // Apply immediately to local element (no interruption to playback)
     el.volume = settingsRef.current.volume
     el.muted  = settingsRef.current.muted
     el.loop   = settingsRef.current.loop
-    syncToPresentation({
-      action: 'audio',
-      volume: settingsRef.current.volume,
-      muted:  settingsRef.current.muted,
-      loop:   settingsRef.current.loop,
-    })
+
+    if (audioSyncTimer.current) clearTimeout(audioSyncTimer.current)
+    audioSyncTimer.current = setTimeout(() => {
+      const s = settingsRef.current
+      syncToPresentation({ action: 'audio', volume: s.volume, muted: s.muted, loop: s.loop })
+      audioSyncTimer.current = null
+    }, 60)
   }, [settings.volume, settings.muted, settings.loop]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Periodic currentTime sync to presentation (every 5 s) ────────────────────
@@ -233,11 +240,7 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
   const play = useCallback(() => {
     const el = elRef.current
     if (!el) return
-    console.log('[VideoOverlay] play() — readyState:', el.readyState,
-      '| buffered:', el.buffered.length > 0
-        ? `0–${el.buffered.end(0).toFixed(1)}s of ${el.duration?.toFixed(1)}s`
-        : 'none')
-    el.play()
+    el.play().catch(() => {})
     syncToPresentation({ action: 'play' })
   }, [])
 
