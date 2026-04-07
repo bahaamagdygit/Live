@@ -52,6 +52,9 @@ interface ElectronAPI {
   onRemoteToggleText: (callback: (visible: boolean) => void) => () => void
   onRemoteOpenPptx: (callback: () => void) => () => void
   onPptxControllerClosed: (callback: () => void) => () => void
+  // Video overlay IPC
+  syncVideoOverlay?: (msg: any) => Promise<{ success: boolean }>
+  onVideoOverlaySync?: (callback: (msg: any) => void) => () => void
 }
 
 declare global {

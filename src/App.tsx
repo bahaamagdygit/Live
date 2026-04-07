@@ -294,23 +294,9 @@ function App() {
       fallbackBase64: cameraFallback.base64 || '',
       fallbackFit: cameraFallback.fit,
       manualFallback,
-      // Video overlay
-      videoBase64: videoOverlay.settings.visible
-        ? (videoOverlay.videos.find(v => v.id === videoOverlay.settings.activeId)?.base64 || '')
-        : '',
-      videoMimeType: videoOverlay.videos.find(v => v.id === videoOverlay.settings.activeId)?.mimeType || 'video/mp4',
-      videoVisible: videoOverlay.settings.visible,
-      videoOpacity: videoOverlay.settings.opacity,
-      videoVolume: videoOverlay.settings.volume,
-      videoMuted: videoOverlay.settings.muted,
-      videoLoop: videoOverlay.settings.loop,
-      videoPosX: videoOverlay.settings.positionX,
-      videoPosY: videoOverlay.settings.positionY,
-      videoWidth: videoOverlay.settings.width,
-      videoHeight: videoOverlay.settings.height,
-      videoMaintainAspect: videoOverlay.settings.maintainAspect,
+      // Video overlay sync is handled via dedicated syncVideoOverlay IPC channel
     })
-  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback, manualFallback, videoOverlay.settings, videoOverlay.videos])
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback, manualFallback])
 
   // ── PPTX Controller window ──────────────────────────────────────────────────
 
@@ -418,24 +404,11 @@ function App() {
           fallbackBase64: cameraFallback.base64 || '',
           fallbackFit: cameraFallback.fit,
           manualFallback,
-          videoBase64: videoOverlay.settings.visible
-            ? (videoOverlay.videos.find(v => v.id === videoOverlay.settings.activeId)?.base64 || '')
-            : '',
-          videoMimeType: videoOverlay.videos.find(v => v.id === videoOverlay.settings.activeId)?.mimeType || 'video/mp4',
-          videoVisible: videoOverlay.settings.visible,
-          videoOpacity: videoOverlay.settings.opacity,
-          videoVolume: videoOverlay.settings.volume,
-          videoMuted: videoOverlay.settings.muted,
-          videoLoop: videoOverlay.settings.loop,
-          videoPosX: videoOverlay.settings.positionX,
-          videoPosY: videoOverlay.settings.positionY,
-          videoWidth: videoOverlay.settings.width,
-          videoHeight: videoOverlay.settings.height,
-          videoMaintainAspect: videoOverlay.settings.maintainAspect,
+          // Video overlay sync is handled via dedicated syncVideoOverlay IPC channel
         })
       }
     }
-  }, [isPresentationOpen, overlaySettings, slides.currentSlideIndex, slides.slides.length, selectedDisplayId, videoOverlay.settings, videoOverlay.videos])
+  }, [isPresentationOpen, overlaySettings, slides.currentSlideIndex, slides.slides.length, selectedDisplayId])
 
   const handleToggleText = useCallback(() => {
     setOverlaySettings((prev) => ({ ...prev, visible: !prev.visible }))

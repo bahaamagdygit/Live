@@ -39,54 +39,83 @@ interface PresentationData {
   line2FontSize?: number
   line2FontFamily?: string
   line2TextColor?: string
-  // Video overlay
-  videoBase64?: string
-  videoMimeType?: string
-  videoVisible?: boolean
-  videoOpacity?: number
-  videoVolume?: number
-  videoMuted?: boolean
-  videoLoop?: boolean
-  videoPosX?: number
-  videoPosY?: number
-  videoWidth?: number
-  videoHeight?: number
-  videoMaintainAspect?: boolean
 }
 
-function VideoOverlayElement({ data }: { data: PresentationData }) {
+// Self-contained video overlay for the presentation window.
+// Receives playback commands via IPC (never receives the file blob itself).
+// The objectURL is valid in both windows because they share the same renderer origin.
+function VideoOverlayElement() {
   const vRef = useRef<HTMLVideoElement>(null)
-  const posX = data.videoPosX ?? 0
-  const posY = data.videoPosY ?? 0
-  const w = data.videoWidth ?? 1920
-  const h = data.videoHeight ?? 1080
 
   useEffect(() => {
-    const v = vRef.current
-    if (!v || !data.videoBase64) return
-    if (v.src !== data.videoBase64) {
-      v.src = data.videoBase64
-      v.load()
-      v.play().catch(() => {})
+    const el = vRef.current
+    if (!el) return
+
+    // Apply CSS directly — never through React state
+    const applySettings = (msg: any) => {
+      if (!el) return
+      if (msg.visible !== undefined) el.style.display = msg.visible ? 'block' : 'none'
+      if (msg.opacity !== undefined) el.style.opacity = String(msg.opacity)
+      const px = msg.positionX ?? 0
+      const py = msg.positionY ?? 0
+      const pw = msg.width ?? 1920
+      const ph = msg.height ?? 1080
+      if (msg.positionX !== undefined || msg.width !== undefined)
+        el.style.left = `${960 + px - pw / 2}px`
+      if (msg.positionY !== undefined || msg.height !== undefined)
+        el.style.top  = `${540 + py - ph / 2}px`
+      if (msg.width !== undefined)  el.style.width  = `${pw}px`
+      if (msg.height !== undefined) el.style.height = msg.maintainAspect !== false ? 'auto' : `${ph}px`
     }
-    v.volume = data.videoVolume ?? 1
-    v.muted = data.videoMuted ?? false
-    v.loop = data.videoLoop ?? false
-  }, [data.videoBase64, data.videoVolume, data.videoMuted, data.videoLoop])
+
+    if (!window.electronAPI?.onVideoOverlaySync) return
+
+    const cleanup = window.electronAPI.onVideoOverlaySync((msg: any) => {
+      switch (msg.action) {
+        case 'load':
+          el.src     = msg.src
+          el.preload = 'auto'
+          el.load()
+          break
+        case 'play':
+          el.play().catch(() => {})
+          break
+        case 'pause':
+          el.pause()
+          break
+        case 'stop':
+          el.pause()
+          el.currentTime = 0
+          break
+        case 'seek':
+          // Only seek if drift > 0.3 s to avoid unnecessary interruptions
+          if (Math.abs(el.currentTime - msg.currentTime) > 0.3)
+            el.currentTime = msg.currentTime
+          break
+        case 'sync-time':
+          if (Math.abs(el.currentTime - msg.currentTime) > 0.3)
+            el.currentTime = msg.currentTime
+          break
+        case 'audio':
+          if (msg.volume  !== undefined) el.volume = msg.volume
+          if (msg.muted   !== undefined) el.muted  = msg.muted
+          if (msg.loop    !== undefined) el.loop   = msg.loop
+          break
+        case 'settings':
+          applySettings(msg)
+          break
+      }
+    })
+
+    return cleanup
+  }, [])
 
   return (
     <video
       ref={vRef}
       className="video-overlay-layer"
       playsInline
-      autoPlay
-      style={{
-        opacity: data.videoOpacity ?? 1,
-        left: `${960 + posX - w / 2}px`,
-        top: `${540 + posY - h / 2}px`,
-        width: `${w}px`,
-        height: data.videoMaintainAspect ? 'auto' : `${h}px`,
-      }}
+      style={{ display: 'none' }}  // hidden until 'settings' msg with visible:true arrives
     />
   )
 }
@@ -354,10 +383,8 @@ export default function PresentationApp() {
           }}
         />
 
-        {/* Video overlay — above camera, below church border */}
-        {data.videoVisible && data.videoBase64 && (
-          <VideoOverlayElement data={data} />
-        )}
+        {/* Video overlay — IPC-driven, always mounted */}
+        <VideoOverlayElement />
 
         {/* Church gold border overlay — text shown inside reading panel */}
         <ChurchBorderOverlay

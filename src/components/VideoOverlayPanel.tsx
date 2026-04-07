@@ -7,7 +7,7 @@ interface VideoOverlayPanelProps {
   isPlaying: boolean
   currentTime: number
   duration: number
-  onAddVideo: (filePath: string, name: string, base64: string, mimeType: 'video/mp4' | 'video/webm') => void
+  onAddVideo: (file: File) => void
   onRemoveVideo: (id: string) => void
   onSelectVideo: (id: string | null) => void
   onUpdateSettings: (patch: Partial<VideoOverlaySettings>) => void
@@ -34,14 +34,7 @@ export function VideoOverlayPanel({
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const mimeType = file.type === 'video/webm' ? 'video/webm' : 'video/mp4'
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const base64 = ev.target?.result as string
-      onAddVideo(file.path || file.name, file.name.replace(/\.[^.]+$/, ''), base64, mimeType)
-    }
-    reader.readAsDataURL(file)
-    // reset so same file can be re-selected
+    onAddVideo(file)
     e.target.value = ''
   }, [onAddVideo])
 

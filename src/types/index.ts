@@ -89,7 +89,7 @@ export interface VideoOverlayItem {
   id: string
   name: string
   filePath: string
-  base64: string        // data URL for rendering
+  objectURL: string     // blob: URL — streamed directly from disk, no memory copy
   mimeType: 'video/mp4' | 'video/webm'
 }
 

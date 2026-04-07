@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState, memo } from 'react'
 import { OverlaySettings, LogoSettings, CameraFallbackSettings, VideoOverlaySettings } from '../types'
 import { ChurchBorderOverlay } from '../presentation/PresentationApp'
 import '../presentation/presentation.css'
@@ -27,6 +27,19 @@ interface MainPreviewProps {
 const PRESENT_W = 1920
 const PRESENT_H = 1080
 
+// ── Isolated video overlay element ────────────────────────────────────────────
+// memo + stable callback ref = this component NEVER re-renders after mount.
+// All CSS (opacity, position, visibility) is applied by the hook via direct DOM.
+const VideoOverlayVideo = memo(({ onMount }: { onMount?: (el: HTMLVideoElement | null) => void }) => (
+  <video
+    ref={onMount}
+    className="video-overlay-layer"
+    playsInline
+    style={{ display: 'none' }}   // hook sets display/opacity/position directly
+  />
+))
+VideoOverlayVideo.displayName = 'VideoOverlayVideo'
+
 export function MainPreview({
   cameraDeviceId,
   overlaySettings,
@@ -34,7 +47,6 @@ export function MainPreview({
   cameraFallback,
   manualFallback = false,
   camView,
-  videoOverlay,
   onVideoElMount,
 }: MainPreviewProps) {
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
@@ -158,11 +170,6 @@ export function MainPreview({
   const stageTop = (previewSize.h - PRESENT_H * scaleFactor) / 2
   const showFallback = cameraFailed || manualFallback
 
-  const vx = videoOverlay?.positionX ?? 0
-  const vy = videoOverlay?.positionY ?? 0
-  const vw = videoOverlay?.width ?? 1920
-  const vh = videoOverlay?.height ?? 1080
-
   return (
     <div className="main-preview" ref={containerRef}>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
@@ -201,20 +208,8 @@ export function MainPreview({
           }}
         />
 
-        {/* Video overlay — callback ref wires hook directly to this element */}
-        <video
-          ref={onVideoElMount}
-          className="video-overlay-layer"
-          playsInline
-          style={{
-            display: videoOverlay?.visible ? 'block' : 'none',
-            opacity: videoOverlay?.opacity ?? 1,
-            left: `${960 + vx - vw / 2}px`,
-            top: `${540 + vy - vh / 2}px`,
-            width: `${vw}px`,
-            height: (videoOverlay?.maintainAspect ?? true) ? 'auto' : `${vh}px`,
-          }}
-        />
+        {/* Video overlay — isolated memo component, never re-renders, hook owns all CSS */}
+        <VideoOverlayVideo onMount={onVideoElMount} />
 
         <ChurchBorderOverlay
           line1={lines[0] || ''}

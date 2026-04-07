@@ -892,6 +892,14 @@ ipcMain.handle('update-presentation', async (_event, data: any) => {
   return { success: false, error: 'Presentation window not open' }
 })
 
+// Video overlay — forward playback commands from control window to presentation window
+ipcMain.handle('sync-video-overlay', async (_event, msg: any) => {
+  if (presentationWindow && !presentationWindow.isDestroyed()) {
+    presentationWindow.webContents.send('video-overlay-sync', msg)
+  }
+  return { success: true }
+})
+
 ipcMain.handle('presentation-fullscreen', async (_event, enable: boolean) => {
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.setFullScreen(enable)
