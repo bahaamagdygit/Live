@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, memo } from 'react'
-import { OverlaySettings, LogoSettings, CameraFallbackSettings, VideoOverlaySettings } from '../types'
+import { OverlaySettings, LogoSettings, CameraFallbackSettings } from '../types'
 import { ChurchBorderOverlay } from '../presentation/PresentationApp'
 import '../presentation/presentation.css'
 
@@ -20,8 +20,7 @@ interface MainPreviewProps {
     flipH: boolean
     flipV: boolean
   }
-  videoOverlay?: VideoOverlaySettings
-  onVideoElMount?: (el: HTMLVideoElement | null) => void
+  videoElMountRef?: React.RefObject<((el: HTMLVideoElement | null) => void) | undefined>
 }
 
 const PRESENT_W = 1920
@@ -47,7 +46,7 @@ export function MainPreview({
   cameraFallback,
   manualFallback = false,
   camView,
-  onVideoElMount,
+  videoElMountRef,
 }: MainPreviewProps) {
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -209,7 +208,7 @@ export function MainPreview({
         />
 
         {/* Video overlay — isolated memo component, never re-renders, hook owns all CSS */}
-        <VideoOverlayVideo onMount={onVideoElMount} />
+        <VideoOverlayVideo onMount={videoElMountRef?.current ?? undefined} />
 
         <ChurchBorderOverlay
           line1={lines[0] || ''}

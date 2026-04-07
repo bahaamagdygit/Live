@@ -1,14 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { CameraPanel } from './components/CameraPanel'
 import { MainPreview } from './components/MainPreview'
 import { TextControls } from './components/TextControls'
 import { StreamControls } from './components/StreamControls'
 import { SettingsModal } from './components/SettingsModal'
-import { VideoOverlayPanel } from './components/VideoOverlayPanel'
+import { VideoOverlayWidget } from './components/VideoOverlayWidget'
 import { useCameras } from './hooks/useCameras'
 import { useStream } from './hooks/useStream'
 import { useSlides } from './hooks/useSlides'
-import { useVideoOverlay } from './hooks/useVideoOverlay'
 import { AppSettings, OverlaySettings, LogoSettings, CameraFallbackSettings } from './types'
 import './App.css'
 
@@ -90,7 +89,12 @@ function App() {
   const cameras = useCameras()
   const stream = useStream()
   const slides = useSlides()
-  const videoOverlay = useVideoOverlay()
+  // Stable ref — VideoOverlayWidget calls onReady(setVideoEl) once on mount.
+  // Storing it in a ref means no re-render when it's set.
+  const videoElMountRef = useRef<((el: HTMLVideoElement | null) => void) | undefined>(undefined)
+  const handleVideoReady = useCallback((setVideoEl: (el: HTMLVideoElement | null) => void) => {
+    videoElMountRef.current = setVideoEl
+  }, [])
 
   // Load settings on startup
   useEffect(() => {
@@ -559,21 +563,7 @@ function App() {
             onToggleManualFallback={() => setManualFallback(v => !v)}
             disconnectedIds={cameras.disconnectedIds}
           />
-          <VideoOverlayPanel
-            videos={videoOverlay.videos}
-            settings={videoOverlay.settings}
-            isPlaying={videoOverlay.isPlaying}
-            currentTime={videoOverlay.currentTime}
-            duration={videoOverlay.duration}
-            onAddVideo={videoOverlay.addVideo}
-            onRemoveVideo={videoOverlay.removeVideo}
-            onSelectVideo={videoOverlay.selectVideo}
-            onUpdateSettings={videoOverlay.updateSettings}
-            onPlay={videoOverlay.play}
-            onPause={videoOverlay.pause}
-            onStop={videoOverlay.stop}
-            onSeek={videoOverlay.seek}
-          />
+          <VideoOverlayWidget onReady={handleVideoReady} />
         </div>
 
         {/* Center: Main Preview */}
@@ -585,8 +575,7 @@ function App() {
             cameraFallback={cameraFallback}
             manualFallback={manualFallback}
             camView={cameras.camView}
-            videoOverlay={videoOverlay.settings}
-            onVideoElMount={videoOverlay.setVideoEl}
+            videoElMountRef={videoElMountRef}
           />
         </div>
 
