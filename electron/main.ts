@@ -30,15 +30,9 @@ async function loadModules() {
   } catch (e) {
   }
   try {
-    // In packaged app, modules are in app.asar.unpacked
-    const unpackedBase = app.isPackaged
-      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')
-      : path.join(__dirname, '..', 'node_modules')
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    pdfParse = require(path.join(unpackedBase, 'pdf-parse'))
-  } catch (e) {
-    // fallback to normal require (dev mode)
-    try { pdfParse = require('pdf-parse') } catch {}
+    pdfParse = require('pdf-parse')
+  } catch (e: any) {
+    console.error('pdf-parse load failed at startup (will retry on first PDF open):', e.message)
   }
   try {
     const unpackedBase = app.isPackaged
@@ -479,8 +473,19 @@ async function parseWithOfficeParser(filePath: string): Promise<any[]> {
 
 // Parse PDF — each page becomes a "slide"
 async function parsePdfFile(filePath: string): Promise<any[]> {
+  // Try to load pdf-parse at call time if not yet loaded
   if (!pdfParse) {
-    return [{ index: 0, text: ['pdf-parse not available'], slideNumber: 1, section: 'PDF' }]
+    const attempts = [
+      () => require('pdf-parse'),
+      () => require(path.join(__dirname, '..', 'node_modules', 'pdf-parse')),
+      () => require(path.join(process.resourcesPath ?? '', 'app.asar.unpacked', 'node_modules', 'pdf-parse')),
+    ]
+    for (const attempt of attempts) {
+      try { pdfParse = attempt(); break } catch { /* try next */ }
+    }
+  }
+  if (!pdfParse) {
+    return [{ index: 0, text: ['pdf-parse could not be loaded — try restarting the app'], slideNumber: 1, section: 'PDF' }]
   }
   try {
     const buffer = fs.readFileSync(filePath)

@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
     "skipLibCheck": true,
+    "target": "ES2020",
     "module": "CommonJS",
     "moduleResolution": "node",
+    "ignoreDeprecations": "5.0",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "strict": false,
