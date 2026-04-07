@@ -34,7 +34,6 @@ interface UseVideoOverlayReturn {
 
 export function useVideoOverlay(): UseVideoOverlayReturn {
   const [videos, setVideos] = useState<VideoOverlayItem[]>([])
-  // settings that cause React re-renders (library list, playback state display)
   const [settings, setSettings] = useState<VideoOverlaySettings>(DEFAULT_VIDEO_OVERLAY)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -42,15 +41,51 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
 
   // The actual <video> DOM element — set via callback ref from MainPreview
   const elRef = useRef<HTMLVideoElement | null>(null)
-  // Latest settings kept in a ref so DOM-manipulation effects always see current values
+
+  // Always-current refs — updated synchronously in updateSettings so DOM effects
+  // never read stale values (unlike useEffect-synced refs which lag one frame).
   const settingsRef = useRef(settings)
-  useEffect(() => { settingsRef.current = settings }, [settings])
   const videosRef = useRef(videos)
-  useEffect(() => { videosRef.current = videos }, [videos])
+
+  // ── Direct DOM: apply CSS properties without touching React state ─────────────
+  function applyCSS(el: HTMLVideoElement, s: VideoOverlaySettings) {
+    el.style.display  = s.visible ? 'block' : 'none'
+    el.style.opacity  = String(s.opacity)
+    const vx = s.positionX, vy = s.positionY, vw = s.width, vh = s.height
+    el.style.left     = `${960 + vx - vw / 2}px`
+    el.style.top      = `${540 + vy - vh / 2}px`
+    el.style.width    = `${vw}px`
+    el.style.height   = s.maintainAspect ? 'auto' : `${vh}px`
+  }
+
+  // ── Load video into element — waits for canplaythrough before resolving ───────
+  function loadVideo(el: HTMLVideoElement, item: VideoOverlayItem, s: VideoOverlaySettings) {
+    el.preload = 'auto'
+    el.loop    = s.loop
+    el.muted   = s.muted
+    el.volume  = s.volume
+
+    // Only reload if src actually changed
+    const newSrc = item.objectURL
+    if (el.src !== newSrc) {
+      console.log('[VideoOverlay] Loading src:', item.name)
+      el.src = newSrc
+      el.load()
+    }
+
+    el.addEventListener('canplaythrough', () => {
+      console.log('[VideoOverlay] canplaythrough — readyState:', el.readyState,
+        '| buffered ranges:', el.buffered.length,
+        '| duration:', el.duration)
+    }, { once: true })
+
+    el.addEventListener('playing', () => {
+      console.log('[VideoOverlay] playing — readyState:', el.readyState,
+        '| currentTime:', el.currentTime)
+    }, { once: true })
+  }
 
   // ── Callback ref ─────────────────────────────────────────────────────────────
-  // React calls this whenever the <video> element mounts or unmounts.
-  // Using named functions so removeEventListener can reference the same instances.
   const onTimeUpdate  = useCallback(function(this: HTMLVideoElement) { setCurrentTime(this.currentTime) }, [])
   const onDurChange   = useCallback(function(this: HTMLVideoElement) { setDuration(isFinite(this.duration) ? this.duration : 0) }, [])
   const onPlayEvt     = useCallback(() => setIsPlaying(true), [])
@@ -70,7 +105,8 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
     elRef.current = el
     if (!el) return
 
-    el.preload = 'metadata'
+    console.log('[VideoOverlay] Video element mounted')
+
     el.addEventListener('timeupdate',     onTimeUpdate)
     el.addEventListener('durationchange', onDurChange)
     el.addEventListener('play',           onPlayEvt)
@@ -81,80 +117,60 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
     const s = settingsRef.current
     const item = videosRef.current.find(v => v.id === s.activeId)
     if (item) {
-      el.src     = item.objectURL
-      el.volume  = s.volume
-      el.muted   = s.muted
-      el.loop    = s.loop
-      el.preload = 'auto'
-      el.load()
+      loadVideo(el, item, s)
     }
-    // Apply current CSS directly — no re-render needed
-    applyCSS(el, settingsRef.current)
+    // Apply current CSS directly
+    applyCSS(el, s)
   }, [onTimeUpdate, onDurChange, onPlayEvt, onPauseEvt, onEndedEvt])
-
-  // ── Direct DOM: apply CSS properties without touching React state ─────────────
-  function applyCSS(el: HTMLVideoElement, s: VideoOverlaySettings) {
-    el.style.opacity  = String(s.opacity)
-    el.style.display  = s.visible ? 'block' : 'none'
-    const vx = s.positionX, vy = s.positionY, vw = s.width, vh = s.height
-    el.style.left     = `${960 + vx - vw / 2}px`
-    el.style.top      = `${540 + vy - vh / 2}px`
-    el.style.width    = `${vw}px`
-    el.style.height   = s.maintainAspect ? 'auto' : `${vh}px`
-  }
 
   // ── When active video changes — load new src ──────────────────────────────────
   useEffect(() => {
     const el = elRef.current
+    const s  = settingsRef.current
+    const item = videosRef.current.find(v => v.id === s.activeId)
     if (!el) return
-    const item = videos.find(v => v.id === settings.activeId)
     if (!item) {
       el.pause()
-      el.src = ''
       el.removeAttribute('src')
       setIsPlaying(false); setCurrentTime(0); setDuration(0)
       return
     }
-    el.src     = item.objectURL
-    el.volume  = settings.volume
-    el.muted   = settings.muted
-    el.loop    = settings.loop
-    el.preload = 'auto'
-    el.load()
+    loadVideo(el, item, s)
     setIsPlaying(false); setCurrentTime(0)
-    // Sync to presentation window — only the src URL string, never the blob
     syncToPresentation({ src: item.objectURL, action: 'load' })
   }, [settings.activeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Apply CSS settings directly to DOM (no re-render) ────────────────────────
-  // This runs whenever any visual setting changes, but never causes the video
-  // element to re-render because we write to the DOM directly.
   useEffect(() => {
     const el = elRef.current
     if (!el) return
-    applyCSS(el, settings)
-    // Sync visibility/opacity to presentation window
+    applyCSS(el, settingsRef.current)
     syncToPresentation({
       action: 'settings',
-      visible:    settings.visible,
-      opacity:    settings.opacity,
-      positionX:  settings.positionX,
-      positionY:  settings.positionY,
-      width:      settings.width,
-      height:     settings.height,
-      maintainAspect: settings.maintainAspect,
+      visible:        settingsRef.current.visible,
+      opacity:        settingsRef.current.opacity,
+      positionX:      settingsRef.current.positionX,
+      positionY:      settingsRef.current.positionY,
+      width:          settingsRef.current.width,
+      height:         settingsRef.current.height,
+      maintainAspect: settingsRef.current.maintainAspect,
     })
   }, [settings.visible, settings.opacity, settings.positionX, settings.positionY,
       settings.width, settings.height, settings.maintainAspect]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Volume/muted/loop — direct DOM only ──────────────────────────────────────
+  // ── Volume / muted / loop — direct DOM only ───────────────────────────────────
   useEffect(() => {
     const el = elRef.current
     if (!el) return
-    el.volume = settings.volume
-    el.muted  = settings.muted
-    el.loop   = settings.loop
-    syncToPresentation({ action: 'audio', volume: settings.volume, muted: settings.muted, loop: settings.loop })
+    el.volume = settingsRef.current.volume
+    el.muted  = settingsRef.current.muted
+    el.loop   = settingsRef.current.loop
+    syncToPresentation({
+      action: 'audio',
+      volume: settingsRef.current.volume,
+      muted:  settingsRef.current.muted,
+      loop:   settingsRef.current.loop,
+    })
   }, [settings.volume, settings.muted, settings.loop]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Periodic currentTime sync to presentation (every 5 s) ────────────────────
@@ -167,37 +183,61 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
     return () => clearInterval(id)
   }, [])
 
-  // ── addVideo — uses objectURL, instant, no memory copy ───────────────────────
+  // ── addVideo ──────────────────────────────────────────────────────────────────
   const addVideo = useCallback((file: File) => {
     const objectURL = URL.createObjectURL(file)
     const mimeType: 'video/mp4' | 'video/webm' = file.type === 'video/webm' ? 'video/webm' : 'video/mp4'
     const id = `vid_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
     const name = file.name.replace(/\.[^.]+$/, '')
-    setVideos(prev => [...prev, { id, name, filePath: (file as any).path || file.name, objectURL, mimeType }])
+    setVideos(prev => {
+      const next = [...prev, { id, name, filePath: (file as any).path || file.name, objectURL, mimeType }]
+      videosRef.current = next
+      return next
+    })
   }, [])
 
   const removeVideo = useCallback((id: string) => {
     setVideos(prev => {
       const item = prev.find(v => v.id === id)
-      if (item) URL.revokeObjectURL(item.objectURL) // free memory
-      return prev.filter(v => v.id !== id)
+      if (item) URL.revokeObjectURL(item.objectURL)
+      const next = prev.filter(v => v.id !== id)
+      videosRef.current = next
+      return next
     })
-    setSettings(prev => prev.activeId === id ? { ...prev, activeId: null, visible: false } : prev)
+    setSettings(prev => {
+      const next = prev.activeId === id ? { ...prev, activeId: null, visible: false } : prev
+      settingsRef.current = next
+      return next
+    })
   }, [])
 
   const selectVideo = useCallback((id: string | null) => {
-    setSettings(prev => ({ ...prev, activeId: id }))
+    setSettings(prev => {
+      const next = { ...prev, activeId: id }
+      settingsRef.current = next
+      return next
+    })
   }, [])
 
-  // updateSettings — writes to React state for panel UI re-render.
-  // CSS-only changes are also applied directly to DOM in the useEffect above.
+  // updateSettings — writes React state (for panel UI) AND syncs ref immediately
+  // so DOM effects in the same tick read fresh values, not stale ones.
   const updateSettings = useCallback((patch: Partial<VideoOverlaySettings>) => {
-    setSettings(prev => ({ ...prev, ...patch }))
+    setSettings(prev => {
+      const next = { ...prev, ...patch }
+      settingsRef.current = next   // ← synchronous, no 1-frame lag
+      return next
+    })
   }, [])
 
-  // ── Playback controls — direct DOM only, zero React state ────────────────────
+  // ── Playback controls ─────────────────────────────────────────────────────────
   const play = useCallback(() => {
-    elRef.current?.play()
+    const el = elRef.current
+    if (!el) return
+    console.log('[VideoOverlay] play() — readyState:', el.readyState,
+      '| buffered:', el.buffered.length > 0
+        ? `0–${el.buffered.end(0).toFixed(1)}s of ${el.duration?.toFixed(1)}s`
+        : 'none')
+    el.play()
     syncToPresentation({ action: 'play' })
   }, [])
 
@@ -228,7 +268,7 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
   }
 }
 
-// ── IPC helper — sends video playback state to the presentation window ─────────
+// ── IPC helper ────────────────────────────────────────────────────────────────
 function syncToPresentation(msg: Record<string, unknown>) {
   try {
     window.electronAPI?.syncVideoOverlay?.(msg)

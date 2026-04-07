@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 import { VideoOverlayItem, VideoOverlaySettings } from '../types'
 
 interface VideoOverlayPanelProps {
@@ -18,7 +18,7 @@ interface VideoOverlayPanelProps {
 }
 
 function formatTime(s: number): string {
-  if (!isFinite(s)) return '0:00'
+  if (!isFinite(s) || s < 0) return '0:00'
   const m = Math.floor(s / 60)
   const sec = Math.floor(s % 60)
   return `${m}:${sec.toString().padStart(2, '0')}`
@@ -29,7 +29,28 @@ export function VideoOverlayPanel({
   onAddVideo, onRemoveVideo, onSelectVideo, onUpdateSettings,
   onPlay, onPause, onStop, onSeek,
 }: VideoOverlayPanelProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef    = useRef<HTMLInputElement>(null)
+  const progressRef     = useRef<HTMLInputElement>(null)
+  const currentTimeRef  = useRef<HTMLSpanElement>(null)
+  const durationRef     = useRef<HTMLSpanElement>(null)
+  // true while the user is dragging the slider — suppress timeupdate DOM writes
+  const isDraggingRef   = useRef(false)
+
+  // Update progress bar and time labels directly — no React state, no re-render
+  useEffect(() => {
+    if (isDraggingRef.current) return
+    if (progressRef.current)    progressRef.current.value    = String(currentTime)
+    if (currentTimeRef.current) currentTimeRef.current.textContent = formatTime(currentTime)
+  }, [currentTime])
+
+  useEffect(() => {
+    if (progressRef.current) {
+      progressRef.current.max = String(duration || 0)
+    }
+    if (durationRef.current) {
+      durationRef.current.textContent = formatTime(duration)
+    }
+  }, [duration])
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -110,20 +131,29 @@ export function VideoOverlayPanel({
           <>
             <div className="vop__section-title">Playback</div>
 
-            {/* Progress bar */}
+            {/* Progress bar — uncontrolled, updated via direct DOM to avoid re-renders */}
             <div className="vop__progress-wrap">
-              <span className="vop__time">{formatTime(currentTime)}</span>
+              <span ref={currentTimeRef} className="vop__time">{formatTime(currentTime)}</span>
               <input
+                ref={progressRef}
                 type="range"
                 className="vop__progress"
                 min={0}
-                max={duration || 0}
+                defaultValue={0}
                 step={0.1}
-                value={currentTime}
-                onChange={e => onSeek(Number(e.target.value))}
                 title="Seek"
+                onMouseDown={() => { isDraggingRef.current = true }}
+                onMouseUp={e => {
+                  isDraggingRef.current = false
+                  onSeek(Number((e.target as HTMLInputElement).value))
+                }}
+                onTouchStart={() => { isDraggingRef.current = true }}
+                onTouchEnd={e => {
+                  isDraggingRef.current = false
+                  onSeek(Number((e.target as HTMLInputElement).value))
+                }}
               />
-              <span className="vop__time">{formatTime(duration)}</span>
+              <span ref={durationRef} className="vop__time">{formatTime(duration)}</span>
             </div>
 
             {/* Play / Pause / Stop */}
