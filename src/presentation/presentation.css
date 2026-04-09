@@ -414,7 +414,6 @@
 
 .church-reading-arabic,
 .church-reading-line1 {
-  font-family: 'Amiri', 'Traditional Arabic', 'Georgia', serif;
   font-size: 34px; font-weight: 700;
   color: #fff8e7;
   text-align: center;
@@ -455,8 +454,6 @@
 
 /* ── Arabic script overrides ─────────────────────────────────────────────── */
 .church-reading--arabic {
-  font-family: 'Amiri', 'Traditional Arabic', 'Scheherazade New',
-               'Arabic Typesetting', serif !important;
   direction: rtl;
   letter-spacing: 0 !important; /* Arabic ligatures break with letter-spacing */
   word-spacing: 2px;
@@ -464,8 +461,7 @@
 
 /* ── Latin/English script overrides ─────────────────────────────────────── */
 .church-reading--english {
-  font-family: 'Cinzel', 'Trajan Pro', 'Georgia', serif !important;
-  letter-spacing: 1.2px !important;
+  letter-spacing: 1.2px;
 }
 .church-reading-divider {
   display: flex; align-items: center; gap: 14px;
@@ -483,7 +479,6 @@
 }
 .church-reading-english,
 .church-reading-line2 {
-  font-family: 'Cinzel', 'Georgia', serif;
   font-size: 17px; font-weight: 400;
   color: #d4a843;
   text-align: center;
