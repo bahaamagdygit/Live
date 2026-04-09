@@ -39,10 +39,11 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
   const [fallbackLoading, setFallbackLoading] = useState(false)
 
   useEffect(() => {
+    if (!isOpen) return
     setLocalSettings(settings)
     setLogoPreview(settings.logoSettings.base64 || '')
     setFallbackPreview(settings.cameraFallback.base64 || '')
-  }, [settings, isOpen])
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null
 

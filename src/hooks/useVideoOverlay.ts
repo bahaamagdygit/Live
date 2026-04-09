@@ -52,15 +52,15 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
   const visualSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audioSyncTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ── Direct DOM: apply CSS properties without touching React state ─────────────
-  function applyCSS(el: HTMLVideoElement, s: VideoOverlaySettings) {
-    el.style.display  = s.visible ? 'block' : 'none'
-    el.style.opacity  = String(s.opacity)
-    const vx = s.positionX, vy = s.positionY, vw = s.width, vh = s.height
-    el.style.left     = `${960 + vx - vw / 2}px`
-    el.style.top      = `${540 + vy - vh / 2}px`
-    el.style.width    = `${vw}px`
-    el.style.height   = s.maintainAspect ? 'auto' : `${vh}px`
+  // ── Direct DOM: keep the main-window element hidden — video only shows on
+  // the presentation screen. The element still needs a src/play for time tracking.
+  function applyCSS(el: HTMLVideoElement, _s: VideoOverlaySettings) {
+    el.style.display  = 'none'
+    el.style.width    = '1px'
+    el.style.height   = '1px'
+    el.style.opacity  = '0'
+    el.style.position = 'absolute'
+    el.style.left     = '-9999px'
   }
 
   // ── Load video into element ───────────────────────────────────────────────────
@@ -132,7 +132,12 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
     }
     loadVideo(el, item, s)
     setIsPlaying(false); setCurrentTime(0)
-    syncToPresentation({ action: 'load', src: item.objectURL })
+    // Send the disk file path so the presentation window (separate process)
+    // can load the video via file:// — objectURL is not valid cross-process.
+    const fileSrc = item.filePath && item.filePath !== item.name
+      ? `file://${item.filePath.replace(/\\/g, '/')}`
+      : item.objectURL
+    syncToPresentation({ action: 'load', src: fileSrc })
   }, [settings.activeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Apply CSS settings directly to DOM — debounced IPC to avoid stutter ──────
@@ -237,15 +242,20 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
   }, [])
 
   // ── Playback controls ─────────────────────────────────────────────────────────
+  // The main-window <video> element is used only for duration/time tracking.
+  // Actual playback happens in the presentation window via IPC.
   const play = useCallback(() => {
     const el = elRef.current
     if (!el) return
+    // Play the hidden local element so timeupdate/duration events fire for the UI
     el.play().catch(() => {})
+    setIsPlaying(true)
     syncToPresentation({ action: 'play' })
   }, [])
 
   const pause = useCallback(() => {
     elRef.current?.pause()
+    setIsPlaying(false)
     syncToPresentation({ action: 'pause' })
   }, [])
 

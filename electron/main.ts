@@ -910,6 +910,7 @@ ipcMain.handle('open-presentation-window', async (_event, displayId?: number) =>
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: false, // Allow loading local file:// video paths
     },
   })
 

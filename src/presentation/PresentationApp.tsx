@@ -43,45 +43,31 @@ interface PresentationData {
 }
 
 // Self-contained video overlay for the presentation window.
-// Receives playback commands via IPC (never receives the file blob itself).
-// The objectURL is valid in both windows because they share the same renderer origin.
+// Receives playback commands via IPC.
+// Uses file:// paths so it works in the separate renderer process.
 function VideoOverlayElement() {
   const vRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     const el = vRef.current
     if (!el) return
-
-    // Apply CSS directly — never through React state
-    const applySettings = (msg: any) => {
-      if (!el) return
-      if (msg.visible !== undefined) el.style.display = msg.visible ? 'block' : 'none'
-      if (msg.opacity !== undefined) el.style.opacity = String(msg.opacity)
-      const px = msg.positionX ?? 0
-      const py = msg.positionY ?? 0
-      const pw = msg.width ?? 1920
-      const ph = msg.height ?? 1080
-      if (msg.positionX !== undefined || msg.width !== undefined)
-        el.style.left = `${960 + px - pw / 2}px`
-      if (msg.positionY !== undefined || msg.height !== undefined)
-        el.style.top  = `${540 + py - ph / 2}px`
-      if (msg.width !== undefined)  el.style.width  = `${pw}px`
-      if (msg.height !== undefined) el.style.height = msg.maintainAspect !== false ? 'auto' : `${ph}px`
-    }
-
     if (!window.electronAPI?.onVideoOverlaySync) return
 
     const cleanup = window.electronAPI.onVideoOverlaySync((msg: any) => {
       switch (msg.action) {
         case 'load':
-          el.src     = msg.src
-          el.preload = 'auto'
-          el.muted   = true
-          el.volume  = 0
-          el.style.opacity = '0.8'
-          el.load()
+          el.pause()
+          if (el.src !== msg.src) {
+            el.src     = msg.src
+            el.preload = 'auto'
+            el.muted   = false
+            el.load()
+          }
+          el.currentTime = 0
+          el.style.display = 'none'
           break
         case 'play':
+          el.style.display = 'block'
           el.play().catch(() => {})
           break
         case 'pause':
@@ -90,24 +76,35 @@ function VideoOverlayElement() {
         case 'stop':
           el.pause()
           el.currentTime = 0
+          el.style.display = 'none'
           break
         case 'seek':
-          // Only seek if drift > 0.3 s to avoid unnecessary interruptions
-          if (Math.abs(el.currentTime - msg.currentTime) > 0.3)
+          if (Math.abs(el.currentTime - (msg.currentTime ?? 0)) > 0.5)
             el.currentTime = msg.currentTime
           break
         case 'sync-time':
-          if (Math.abs(el.currentTime - msg.currentTime) > 0.3)
+          if (Math.abs(el.currentTime - (msg.currentTime ?? 0)) > 0.5)
             el.currentTime = msg.currentTime
           break
         case 'audio':
-          if (msg.volume  !== undefined) el.volume = msg.volume
-          if (msg.muted   !== undefined) el.muted  = msg.muted
-          if (msg.loop    !== undefined) el.loop   = msg.loop
+          if (msg.volume !== undefined) el.volume = msg.volume
+          if (msg.muted  !== undefined) el.muted  = msg.muted
+          if (msg.loop   !== undefined) el.loop   = msg.loop
           break
-        case 'settings':
-          applySettings(msg)
+        case 'settings': {
+          const px = msg.positionX ?? 0
+          const py = msg.positionY ?? 0
+          const pw = msg.width     ?? 1920
+          const ph = msg.height    ?? 1080
+          el.style.left   = `${960 + px - pw / 2}px`
+          el.style.top    = `${540 + py - ph / 2}px`
+          el.style.width  = `${pw}px`
+          el.style.height = msg.maintainAspect !== false ? 'auto' : `${ph}px`
+          if (msg.opacity !== undefined) el.style.opacity = String(msg.opacity)
+          // Only hide on visible:false — play() is what shows it
+          if (msg.visible === false) el.style.display = 'none'
           break
+        }
       }
     })
 
@@ -119,7 +116,7 @@ function VideoOverlayElement() {
       ref={vRef}
       className="video-overlay-layer"
       playsInline
-      style={{ display: 'none' }}  // hidden until 'settings' msg with visible:true arrives
+      style={{ display: 'none' }}
     />
   )
 }

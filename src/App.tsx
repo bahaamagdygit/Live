@@ -278,8 +278,12 @@ function App() {
   useEffect(() => {
     const text = slides.getCurrentText()
     const langs = slides.getCurrentLangs()
-    setOverlaySettings((prev) => ({ ...prev, text, langs }))
-  }, [slides.currentSlideIndex, slides.slides])
+    setOverlaySettings((prev) => {
+      // Skip update if nothing actually changed — prevents infinite loop
+      if (prev.text === text && prev.langs === langs) return prev
+      return { ...prev, text, langs }
+    })
+  }, [slides.currentSlide]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for presentation window being closed externally
   useEffect(() => {
