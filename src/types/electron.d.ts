@@ -65,7 +65,7 @@ interface ElectronAPI {
   onRemoteOpenPptx: (callback: () => void) => () => void
   onPptxControllerClosed: (callback: () => void) => () => void
   // Video overlay IPC
-  syncVideoOverlay?: (msg: any) => Promise<{ success: boolean }>
+  syncVideoOverlay?: (msg: any) => void
   onVideoOverlaySync?: (callback: (msg: any) => void) => () => void
 }
 

@@ -82,7 +82,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('pptx-controller-closed', listener)
   },
   // Video overlay — control window sends playback commands; presentation window receives them
-  syncVideoOverlay: (msg: any) => ipcRenderer.invoke('sync-video-overlay', msg),
+  syncVideoOverlay: (msg: any) => ipcRenderer.send('sync-video-overlay', msg),
   onVideoOverlaySync: (callback: (msg: any) => void) => {
     const listener = (_: any, msg: any) => callback(msg)
     ipcRenderer.on('video-overlay-sync', listener)

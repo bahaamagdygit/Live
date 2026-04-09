@@ -38,6 +38,7 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const currentTimeRef = useRef(0)
 
   // The actual <video> DOM element — set via callback ref from MainPreview
   const elRef = useRef<HTMLVideoElement | null>(null)
@@ -79,29 +80,25 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
   }
 
   // ── Callback ref ─────────────────────────────────────────────────────────────
-  const onTimeUpdate  = useCallback(function(this: HTMLVideoElement) { setCurrentTime(this.currentTime) }, [])
   const onDurChange   = useCallback(function(this: HTMLVideoElement) { setDuration(isFinite(this.duration) ? this.duration : 0) }, [])
-  const onPlayEvt     = useCallback(() => setIsPlaying(true), [])
-  const onPauseEvt    = useCallback(() => setIsPlaying(false), [])
-  const onEndedEvt    = useCallback(() => { setIsPlaying(false); setCurrentTime(0) }, [])
+  const onEndedEvt    = useCallback(() => {
+    if (playTimerRef.current) { clearInterval(playTimerRef.current); playTimerRef.current = null }
+    setIsPlaying(false)
+    currentTimeRef.current = 0
+    setCurrentTime(0)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setVideoEl = useCallback((el: HTMLVideoElement | null) => {
     const old = elRef.current
     if (old) {
-      old.removeEventListener('timeupdate',     onTimeUpdate)
       old.removeEventListener('durationchange', onDurChange)
-      old.removeEventListener('play',           onPlayEvt)
-      old.removeEventListener('pause',          onPauseEvt)
       old.removeEventListener('ended',          onEndedEvt)
     }
 
     elRef.current = el
     if (!el) return
 
-    el.addEventListener('timeupdate',     onTimeUpdate)
     el.addEventListener('durationchange', onDurChange)
-    el.addEventListener('play',           onPlayEvt)
-    el.addEventListener('pause',          onPauseEvt)
     el.addEventListener('ended',          onEndedEvt)
 
     // If a video is already selected, load it immediately
@@ -110,13 +107,11 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
     if (item) {
       loadVideo(el, item, s)
     }
-    // Apply current CSS directly
     applyCSS(el, s)
-    // Apply audio settings
     el.volume = s.volume
     el.muted  = s.muted
     el.loop   = s.loop
-  }, [onTimeUpdate, onDurChange, onPlayEvt, onPauseEvt, onEndedEvt])
+  }, [onDurChange, onEndedEvt])
 
   // ── When active video changes — load new src ──────────────────────────────────
   useEffect(() => {
@@ -242,35 +237,52 @@ export function useVideoOverlay(): UseVideoOverlayReturn {
   }, [])
 
   // ── Playback controls ─────────────────────────────────────────────────────────
-  // The main-window <video> element is used only for duration/time tracking.
-  // Actual playback happens in the presentation window via IPC.
+  // The main-window <video> element is NOT played — it would decode the video a
+  // second time, competing with the presentation window and causing lag.
+  // We track currentTime with a lightweight JS timer instead.
+  const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const playStartTimeRef = useRef(0)   // wall-clock ms when play started
+  const playOffsetRef    = useRef(0)   // currentTime value at the moment play started
+
+  const stopPlayTimer = useCallback(() => {
+    if (playTimerRef.current) { clearInterval(playTimerRef.current); playTimerRef.current = null }
+  }, [])
+
   const play = useCallback(() => {
     const el = elRef.current
     if (!el) return
-    // Play the hidden local element so timeupdate/duration events fire for the UI
-    el.play().catch(() => {})
+    // Get duration from the local element (it has src loaded, just not playing)
     setIsPlaying(true)
+    playStartTimeRef.current = performance.now()
+    playOffsetRef.current    = currentTimeRef.current
+    stopPlayTimer()
+    playTimerRef.current = setInterval(() => {
+      const elapsed = (performance.now() - playStartTimeRef.current) / 1000
+      const next = playOffsetRef.current + elapsed
+      const dur  = elRef.current?.duration ?? 0
+      setCurrentTime(dur > 0 ? Math.min(next, dur) : next)
+    }, 250)
     syncToPresentation({ action: 'play' })
-  }, [])
+  }, [stopPlayTimer])
 
   const pause = useCallback(() => {
-    elRef.current?.pause()
+    stopPlayTimer()
     setIsPlaying(false)
     syncToPresentation({ action: 'pause' })
-  }, [])
+  }, [stopPlayTimer])
 
   const stop = useCallback(() => {
-    const el = elRef.current
-    if (!el) return
-    el.pause()
-    el.currentTime = 0
+    stopPlayTimer()
     setCurrentTime(0)
     setIsPlaying(false)
+    playOffsetRef.current = 0
     syncToPresentation({ action: 'stop' })
-  }, [])
+  }, [stopPlayTimer])
 
   const seek = useCallback((time: number) => {
-    if (elRef.current) elRef.current.currentTime = time
+    playOffsetRef.current    = time
+    playStartTimeRef.current = performance.now()
+    setCurrentTime(time)
     syncToPresentation({ action: 'seek', currentTime: time })
   }, [])
 
