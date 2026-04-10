@@ -251,14 +251,10 @@ interface IpCameraEntry {
 const ipCameraMap = new Map<string, IpCameraEntry>()
 let nextMjpegPort = 18900 // Starting port for MJPEG HTTP servers
 
-function startRtspProxy(entry: IpCameraEntry): Promise<void> {
+async function startRtspProxy(entry: IpCameraEntry): Promise<void> {
+  const ffmpegPath = await findFFmpeg()
+
   return new Promise((resolve, reject) => {
-    let ffmpegPath: string
-    try {
-      ffmpegPath = findFFmpegSync()
-    } catch (err: any) {
-      return reject(err)
-    }
 
     // Each camera gets its own tiny HTTP server that serves MJPEG
     const clients = new Set<http.ServerResponse>()
@@ -357,31 +353,86 @@ function stopRtspProxy(id: string) {
   entry.server = null
 }
 
-// findFFmpegSync is the synchronous version used inside IP camera startup
-// Returns the path or throws an error with instructions if not found.
-function findFFmpegSync(): string {
+// ── FFmpeg find + auto-download ───────────────────────────────────────────────
+let _ffmpegPathCache: string | null = null
+
+function getFFmpegResourceDir(): string {
+  // dev: <repo>/resources/    packaged: next to app.asar in resourcesPath
+  try { return path.join(getAppPath(), 'resources') } catch { return path.join(__dirname, '..', 'resources') }
+}
+
+function findFFmpegInCandidates(): string | null {
   const candidates = [
     'ffmpeg',
     'C:\\ffmpeg\\bin\\ffmpeg.exe',
     'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
     'C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe',
-    path.join(__dirname, '..', 'resources', 'ffmpeg.exe'),   // dev: electron/../resources/
-    path.join(getAppPath(), 'resources', 'ffmpeg.exe'),       // packaged
-    path.join(getAppPath(), 'ffmpeg.exe'),
+    path.join(__dirname, '..', 'resources', 'ffmpeg.exe'),
+    path.join(getFFmpegResourceDir(), 'ffmpeg.exe'),
+    path.join(getFFmpegResourceDir(), '..', 'ffmpeg.exe'),
   ]
   for (const c of candidates) {
-    try {
-      execSync(`"${c}" -version`, { stdio: 'ignore', timeout: 3000 })
-      return c
-    } catch {}
+    try { execSync(`"${c}" -version`, { stdio: 'ignore', timeout: 3000 }); return c } catch {}
   }
-  throw new Error(
-    'FFmpeg not found. Please install FFmpeg:\n' +
-    '1. Download from https://www.gyan.dev/ffmpeg/builds/ (ffmpeg-release-essentials.zip)\n' +
-    '2. Extract and copy ffmpeg.exe to C:\\ffmpeg\\bin\\\n' +
-    '3. Restart this application'
-  )
+  return null
 }
+
+async function downloadFFmpeg(): Promise<string> {
+  const destDir  = getFFmpegResourceDir()
+  const destPath = path.join(destDir, 'ffmpeg.exe')
+  const zipPath  = path.join(destDir, 'ffmpeg_tmp.zip')
+  fs.mkdirSync(destDir, { recursive: true })
+
+  mainWindow?.webContents.send('ffmpeg-download-status', { status: 'downloading' })
+
+  const url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'
+
+  await new Promise<void>((resolve, reject) => {
+    const file = fs.createWriteStream(zipPath)
+    const request = (urlStr: string, hops = 0) => {
+      if (hops > 5) return reject(new Error('Too many redirects'))
+      const mod = urlStr.startsWith('https') ? require('https') : require('http')
+      mod.get(urlStr, (res: any) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location)
+          return request(res.headers.location, hops + 1)
+        if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`))
+        res.pipe(file)
+        file.on('finish', () => { file.close(); resolve() })
+        file.on('error', reject)
+      }).on('error', reject)
+    }
+    request(url)
+  })
+
+  mainWindow?.webContents.send('ffmpeg-download-status', { status: 'extracting' })
+
+  // Extract ffmpeg.exe using PowerShell (always available on Windows)
+  await new Promise<void>((resolve, reject) => {
+    const cmd =
+      `Add-Type -Assembly System.IO.Compression.FileSystem;` +
+      `$z=[IO.Compression.ZipFile]::OpenRead('${zipPath.replace(/\\/g, '\\\\')}');` +
+      `$e=$z.Entries|Where-Object{$_.Name -eq 'ffmpeg.exe'}|Select-Object -First 1;` +
+      `[IO.Compression.ZipFileExtensions]::ExtractToFile($e,'${destPath.replace(/\\/g, '\\\\')}', $true);` +
+      `$z.Dispose()`
+    const ps = spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', cmd], { stdio: 'ignore' })
+    ps.on('exit', code => code === 0 ? resolve() : reject(new Error(`PowerShell exit ${code}`)))
+    ps.on('error', reject)
+  })
+
+  try { fs.unlinkSync(zipPath) } catch {}
+  mainWindow?.webContents.send('ffmpeg-download-status', { status: 'done' })
+  return destPath
+}
+
+async function findFFmpeg(): Promise<string> {
+  if (_ffmpegPathCache) return _ffmpegPathCache
+  const found = findFFmpegInCandidates()
+  if (found) { _ffmpegPathCache = found; return found }
+  const downloaded = await downloadFFmpeg()
+  _ffmpegPathCache = downloaded
+  return downloaded
+}
+
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1' || !app.isPackaged
 
@@ -879,58 +930,14 @@ async function parseWordFile(filePath: string): Promise<any[]> {
   }
 }
 
-// Find FFmpeg executable
-function findFFmpeg(): string {
-  const candidates = [
-    'ffmpeg',
-    'C:\\ffmpeg\\bin\\ffmpeg.exe',
-    'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
-    path.join(getAppPath(), 'resources', 'ffmpeg.exe'),
-  ]
-
-  for (const candidate of candidates) {
-    try {
-      execSync(`"${candidate}" -version`, { stdio: 'ignore', timeout: 3000 })
-      return candidate
-    } catch {
-      continue
-    }
-  }
-
-  return 'ffmpeg' // Let it fail naturally with a meaningful error
-}
-
-function checkFFmpeg(): boolean {
-  try {
-    execSync(`ffmpeg -version`, { stdio: 'ignore', timeout: 3000 })
-    return true
-  } catch {
-    try {
-      const ffmpegPath = findFFmpeg()
-      execSync(`"${ffmpegPath}" -version`, { stdio: 'ignore', timeout: 3000 })
-      return true
-    } catch {
-      return false
-    }
-  }
-}
-
 // Start RTMP stream
 ipcMain.handle('start-stream', async (_event, config: any) => {
   if (ffmpegStreamProcess) {
     return { success: false, error: 'Stream already running' }
   }
 
-  const ffmpegAvailable = checkFFmpeg()
-  if (!ffmpegAvailable) {
-    return {
-      success: false,
-      error:
-        'FFmpeg not found. Please install FFmpeg and add it to your PATH, or place ffmpeg.exe in the resources folder.',
-    }
-  }
-
-  const ffmpegPath = findFFmpeg()
+  let ffmpegPath: string
+  try { ffmpegPath = await findFFmpeg() } catch (e: any) { return { success: false, error: e.message } }
   const {
     rtmpUrl,
     streamKey,
@@ -1041,13 +1048,8 @@ ipcMain.handle('start-recording', async (_event, config: any) => {
     return { success: false, error: 'Recording already in progress' }
   }
 
-  const ffmpegAvailable = checkFFmpeg()
-  if (!ffmpegAvailable) {
-    return {
-      success: false,
-      error: 'FFmpeg not found. Please install FFmpeg.',
-    }
-  }
+  let ffmpegPath: string
+  try { ffmpegPath = await findFFmpeg() } catch (e: any) { return { success: false, error: e.message } }
 
   if (!mainWindow) return { success: false, error: 'No window' }
 
@@ -1060,8 +1062,6 @@ ipcMain.handle('start-recording', async (_event, config: any) => {
   if (saveResult.canceled || !saveResult.filePath) {
     return { success: false, canceled: true }
   }
-
-  const ffmpegPath = findFFmpeg()
   const { cameraName = '', resolution = '720p', fps = 30 } = config
   const [width, height] = resolution === '1080p' ? [1920, 1080] : [1280, 720]
 
