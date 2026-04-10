@@ -172,6 +172,8 @@ export function CameraPanel({
   const [ipChannel, setIpChannel] = useState('1')
   const [ipSubStream, setIpSubStream] = useState(false)
   const [ipBrand, setIpBrand] = useState<'hilook' | 'hikvision' | 'dahua' | 'generic'>('hilook')
+  const [ipPasteMode, setIpPasteMode] = useState(false)   // paste raw RTSP URL
+  const [ipPasteUrl, setIpPasteUrl] = useState('')
   const [ipAddError, setIpAddError] = useState<string | null>(null)
   const [ipAdding, setIpAdding] = useState(false)
   // Mobile camera
@@ -181,24 +183,26 @@ export function CameraPanel({
   const [mobileCamMjpegUrl, setMobileCamMjpegUrl] = useState<string | null>(null)
   const [showMobileQr, setShowMobileQr] = useState(false)
 
-  // Build RTSP URL from structured fields
+  // Build RTSP URL from structured fields.
+  // Pass credentials raw — FFmpeg handles them directly, no URL-encoding needed.
   const buildRtspUrl = () => {
-    const auth = ipUser ? `${encodeURIComponent(ipUser)}:${encodeURIComponent(ipPass)}@` : ''
+    if (ipPasteMode) return ipPasteUrl.trim()
+    const auth = ipUser ? `${ipUser}:${ipPass}@` : ''
     const port = ipPort || '554'
-    const ch = ipChannel.padStart(2, '0')
-    const stream = ipSubStream ? '02' : '01'
+    // channel number + stream digit, e.g. channel=1 main → "101", channel=2 sub → "202"
+    const streamDigit = ipSubStream ? '2' : '1'
+    const chStream = `${ipChannel}${streamDigit}`   // matches OBS format: 101, 102, 201…
 
     if (ipBrand === 'hilook' || ipBrand === 'hikvision') {
-      // HiLook & Hikvision both use the ISAPI path
-      return `rtsp://${auth}${ipHost}:${port}/ISAPI/Streaming/Channels/${ch}${stream}`
+      // Same path OBS uses — no ISAPI prefix
+      return `rtsp://${auth}${ipHost}:${port}/Streaming/Channels/${chStream}`
     }
     if (ipBrand === 'dahua') {
-      // Dahua: rtsp://user:pass@ip:554/cam/realmonitor?channel=1&subtype=0
       const subtype = ipSubStream ? 1 : 0
       return `rtsp://${auth}${ipHost}:${port}/cam/realmonitor?channel=${ipChannel}&subtype=${subtype}`
     }
-    // Generic — bare path
-    return `rtsp://${auth}${ipHost}:${port}/Streaming/Channels/${ch}${stream}`
+    // Generic
+    return `rtsp://${auth}${ipHost}:${port}/Streaming/Channels/${chStream}`
   }
 
   const set = (patch: Partial<CameraViewSettings>) => onCamViewChange(patch)
@@ -235,21 +239,18 @@ export function CameraPanel({
 
   const handleIpAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!ipHost.trim()) return
+    if (ipPasteMode && !ipPasteUrl.trim()) return
+    if (!ipPasteMode && !ipHost.trim()) return
     setIpAdding(true)
     setIpAddError(null)
     const rtspUrl = buildRtspUrl()
-    const res = await onAddIpCamera(ipLabel || `Camera ${ipHost}`, rtspUrl)
+    const autoLabel = ipPasteMode ? `Camera (${ipPasteUrl.split('@').pop()?.split('/')[0] ?? 'IP'})` : `Camera ${ipHost}`
+    const res = await onAddIpCamera(ipLabel || autoLabel, rtspUrl)
     setIpAdding(false)
     if (res.success) {
-      setIpLabel('')
-      setIpHost('')
-      setIpPort('554')
-      setIpUser('admin')
-      setIpPass('')
-      setIpChannel('1')
-      setIpSubStream(false)
-      setShowIpForm(false)
+      setIpLabel(''); setIpHost(''); setIpPort('554'); setIpUser('admin')
+      setIpPass(''); setIpChannel('1'); setIpSubStream(false)
+      setIpPasteUrl(''); setIpPasteMode(false); setShowIpForm(false)
     } else {
       setIpAddError(res.error ?? 'Failed to connect')
     }
@@ -437,117 +438,107 @@ export function CameraPanel({
         {/* ── Add IP Camera Form ── */}
         {showIpForm && (
           <form className="ipcam-form" onSubmit={handleIpAddSubmit}>
-            <div className="ipcam-form__title">📡 Add IP / DVR Camera</div>
-
-            <div className="ipcam-form__row">
-              <label className="ipcam-form__label">Brand / Type</label>
-              <div className="ipcam-form__brand-grid">
-                {(['hilook', 'hikvision', 'dahua', 'generic'] as const).map(b => (
-                  <button
-                    key={b}
-                    type="button"
-                    className={`ipcam-form__brand-btn ${ipBrand === b ? 'ipcam-form__brand-btn--on' : ''}`}
-                    onClick={() => setIpBrand(b)}
-                  >
-                    {b === 'hilook' ? 'HiLook' : b === 'hikvision' ? 'Hikvision' : b === 'dahua' ? 'Dahua' : 'Generic'}
-                  </button>
-                ))}
-              </div>
+            <div className="ipcam-form__title">
+              📡 Add IP / DVR Camera
+              <button type="button" className="ipcam-form__mode-toggle"
+                onClick={() => { setIpPasteMode(m => !m); setIpAddError(null) }}>
+                {ipPasteMode ? '⚙ Use Form' : '📋 Paste URL'}
+              </button>
             </div>
 
-            <div className="ipcam-form__row">
-              <label className="ipcam-form__label">Camera Name</label>
-              <input
-                className="ipcam-form__input"
-                type="text"
-                placeholder="e.g. Front Door"
-                value={ipLabel}
-                onChange={e => setIpLabel(e.target.value)}
-              />
-            </div>
+            {ipPasteMode ? (
+              /* ── Paste mode: one field, paste directly from OBS ── */
+              <>
+                <div className="ipcam-form__row">
+                  <label className="ipcam-form__label">Camera Name (optional)</label>
+                  <input className="ipcam-form__input" type="text" placeholder="e.g. Front Cam"
+                    value={ipLabel} onChange={e => setIpLabel(e.target.value)} />
+                </div>
+                <div className="ipcam-form__row">
+                  <label className="ipcam-form__label">RTSP URL — paste from OBS</label>
+                  <input className="ipcam-form__input" type="text"
+                    placeholder="rtsp://admin:pass@192.168.1.6/Streaming/Channels/101"
+                    value={ipPasteUrl} onChange={e => setIpPasteUrl(e.target.value)}
+                    autoFocus required />
+                </div>
+              </>
+            ) : (
+              /* ── Guided form ── */
+              <>
+                <div className="ipcam-form__row">
+                  <label className="ipcam-form__label">Brand / Type</label>
+                  <div className="ipcam-form__brand-grid">
+                    {(['hilook', 'hikvision', 'dahua', 'generic'] as const).map(b => (
+                      <button key={b} type="button"
+                        className={`ipcam-form__brand-btn ${ipBrand === b ? 'ipcam-form__brand-btn--on' : ''}`}
+                        onClick={() => setIpBrand(b)}>
+                        {b === 'hilook' ? 'HiLook' : b === 'hikvision' ? 'Hikvision' : b === 'dahua' ? 'Dahua' : 'Generic'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            <div className="ipcam-form__row">
-              <label className="ipcam-form__label">DVR / Camera IP</label>
-              <input
-                className="ipcam-form__input"
-                type="text"
-                placeholder="192.168.1.64"
-                value={ipHost}
-                onChange={e => setIpHost(e.target.value)}
-                required
-              />
-            </div>
+                <div className="ipcam-form__row">
+                  <label className="ipcam-form__label">Camera Name (optional)</label>
+                  <input className="ipcam-form__input" type="text" placeholder="e.g. Front Door"
+                    value={ipLabel} onChange={e => setIpLabel(e.target.value)} />
+                </div>
 
-            <div className="ipcam-form__grid2">
-              <div>
-                <label className="ipcam-form__label">Port</label>
-                <input
-                  className="ipcam-form__input"
-                  type="number"
-                  placeholder="554"
-                  value={ipPort}
-                  onChange={e => setIpPort(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="ipcam-form__label">Channel</label>
-                <input
-                  className="ipcam-form__input"
-                  type="number"
-                  min="1"
-                  max="64"
-                  placeholder="1"
-                  value={ipChannel}
-                  onChange={e => setIpChannel(e.target.value)}
-                />
-              </div>
-            </div>
+                <div className="ipcam-form__row">
+                  <label className="ipcam-form__label">DVR / Camera IP</label>
+                  <input className="ipcam-form__input" type="text" placeholder="192.168.1.6"
+                    value={ipHost} onChange={e => setIpHost(e.target.value)} required />
+                </div>
 
-            <div className="ipcam-form__grid2">
-              <div>
-                <label className="ipcam-form__label">Username</label>
-                <input
-                  className="ipcam-form__input"
-                  type="text"
-                  placeholder="admin"
-                  value={ipUser}
-                  onChange={e => setIpUser(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="ipcam-form__label">Password</label>
-                <input
-                  className="ipcam-form__input"
-                  type="password"
-                  placeholder="••••••••"
-                  value={ipPass}
-                  onChange={e => setIpPass(e.target.value)}
-                />
-              </div>
-            </div>
+                <div className="ipcam-form__grid2">
+                  <div>
+                    <label className="ipcam-form__label">Port</label>
+                    <input className="ipcam-form__input" type="number" placeholder="554"
+                      value={ipPort} onChange={e => setIpPort(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="ipcam-form__label">Channel</label>
+                    <input className="ipcam-form__input" type="number" min="1" max="64" placeholder="1"
+                      value={ipChannel} onChange={e => setIpChannel(e.target.value)} />
+                  </div>
+                </div>
 
-            <div className="ipcam-form__row ipcam-form__row--check">
-              <label className="ipcam-form__check-label">
-                <input
-                  type="checkbox"
-                  checked={ipSubStream}
-                  onChange={e => setIpSubStream(e.target.checked)}
-                />
-                Sub-stream (lower quality, less bandwidth)
-              </label>
-            </div>
+                <div className="ipcam-form__grid2">
+                  <div>
+                    <label className="ipcam-form__label">Username</label>
+                    <input className="ipcam-form__input" type="text" placeholder="admin"
+                      value={ipUser} onChange={e => setIpUser(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="ipcam-form__label">Password</label>
+                    <input className="ipcam-form__input" type="password" placeholder="••••••••"
+                      value={ipPass} onChange={e => setIpPass(e.target.value)} />
+                  </div>
+                </div>
 
-            <div className="ipcam-form__preview-url">
-              {ipHost ? buildRtspUrl() : 'Fill in the IP address above'}
-            </div>
+                <div className="ipcam-form__row ipcam-form__row--check">
+                  <label className="ipcam-form__check-label">
+                    <input type="checkbox" checked={ipSubStream}
+                      onChange={e => setIpSubStream(e.target.checked)} />
+                    Sub-stream (lower quality, less bandwidth)
+                  </label>
+                </div>
+
+                <div className="ipcam-form__preview-url">
+                  {ipHost ? buildRtspUrl() : 'Fill in the IP address above'}
+                </div>
+              </>
+            )}
 
             {ipAddError && <div className="alert alert--error alert--sm">{ipAddError}</div>}
 
             <div className="ipcam-form__actions">
-              <button type="submit" className="btn btn--primary btn--sm" disabled={!ipHost.trim() || ipAdding}>
+              <button type="submit" className="btn btn--primary btn--sm"
+                disabled={(ipPasteMode ? !ipPasteUrl.trim() : !ipHost.trim()) || ipAdding}>
                 {ipAdding ? 'Connecting…' : '📡 Connect'}
               </button>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setShowIpForm(false); setIpAddError(null) }}>
+              <button type="button" className="btn btn--ghost btn--sm"
+                onClick={() => { setShowIpForm(false); setIpAddError(null) }}>
                 Cancel
               </button>
             </div>
