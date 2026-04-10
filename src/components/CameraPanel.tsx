@@ -190,8 +190,9 @@ export function CameraPanel({
     const enc = (s: string) => encodeURIComponent(s)   // encode each part individually
     const auth = ipUser ? `${enc(ipUser)}:${enc(ipPass)}@` : ''
     const port = ipPort || '554'
-    const streamDigit = ipSubStream ? '2' : '1'
-    const chStream = `${ipChannel}${streamDigit}`   // OBS format: 101 = ch1 main, 102 = ch1 sub
+    const streamDigit = ipSubStream ? 2 : 1
+    // HiLook/Hikvision format: channel 1 main = 101, channel 1 sub = 102, channel 2 main = 201
+    const chStream = parseInt(ipChannel || '1') * 100 + streamDigit
 
     if (ipBrand === 'hilook' || ipBrand === 'hikvision') {
       return `rtsp://${auth}${ipHost}:${port}/Streaming/Channels/${chStream}`
