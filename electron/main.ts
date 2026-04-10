@@ -254,6 +254,21 @@ let nextMjpegPort = 18900 // Starting port for MJPEG HTTP servers
 async function startRtspProxy(entry: IpCameraEntry): Promise<void> {
   const ffmpegPath = await findFFmpeg()
 
+  // Try TCP first, then UDP — some cameras only accept one transport
+  const transports = ['tcp', 'udp']
+
+  for (const transport of transports) {
+    try {
+      await tryRtspTransport(entry, ffmpegPath, transport)
+      return  // success — stop trying
+    } catch (err: any) {
+      if (transport === transports[transports.length - 1]) throw err  // last attempt — propagate
+      // else try next transport
+    }
+  }
+}
+
+function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: string): Promise<void> {
   return new Promise((resolve, reject) => {
 
     // Each camera gets its own tiny HTTP server that serves MJPEG
@@ -270,14 +285,15 @@ async function startRtspProxy(entry: IpCameraEntry): Promise<void> {
     })
 
     server.listen(entry.port, '127.0.0.1', () => {
-      // FFmpeg: read RTSP, output MJPEG frames to stdout
       const args = [
-        '-rtsp_transport', 'tcp',
+        '-loglevel', 'warning',
+        '-rtsp_transport', transport,
+        '-stimeout', '10000000',      // 10s socket timeout (microseconds)
         '-i', entry.rtspUrl,
-        '-an',                   // no audio
+        '-an',
         '-f', 'mjpeg',
         '-q:v', '5',
-        '-r', '15',              // 15 fps is enough for preview
+        '-r', '15',
         'pipe:1',
       ]
 
@@ -299,7 +315,6 @@ async function startRtspProxy(entry: IpCameraEntry): Promise<void> {
       proc.stdout?.on('data', (chunk: Buffer) => {
         if (!resolved) { resolved = true; resolve() }
         buffer = Buffer.concat([buffer, chunk])
-        // Extract complete JPEG frames and push to all connected clients
         let start = 0
         while (true) {
           const s = buffer.indexOf(SOI, start)
@@ -317,27 +332,42 @@ async function startRtspProxy(entry: IpCameraEntry): Promise<void> {
       })
 
       proc.on('error', (err) => {
-        if (!resolved) reject(err)
+        if (!resolved) { server.close(); reject(err) }
       })
 
-      // If FFmpeg exits quickly with no output, it means connection failed
       proc.on('exit', (code) => {
         if (!resolved) {
-          const hint = stderrLog.includes('401') ? ' (Wrong username/password)'
-            : stderrLog.includes('Connection refused') ? ' (Camera refused connection)'
-            : stderrLog.includes('No route to host') || stderrLog.includes('Connection timed out') ? ' (Camera unreachable — check IP)'
-            : ''
-          reject(new Error(`Cannot connect to camera${hint}. Code: ${code}`))
+          server.close()
+          // Parse the actual FFmpeg error for a useful message
+          const stderr = stderrLog
+          const msg =
+            stderr.includes('401') || stderr.includes('Unauthorized')
+              ? 'Wrong username or password (401)'
+            : stderr.includes('Connection refused')
+              ? 'Connection refused — check IP and port'
+            : stderr.includes('No route to host') || stderr.includes('timed out') || stderr.includes('WSAETIMEDOUT')
+              ? 'Camera unreachable — check IP address'
+            : stderr.includes('Invalid data') || stderr.includes('moov atom')
+              ? 'Camera connected but stream format not supported'
+            : stderr.match(/rtsp:\/\/[^ ]+: ([^\n]+)/)?.[1]   // extract FFmpeg's own message
+              ?? stderr.split('\n').filter(Boolean).pop()       // last non-empty line
+              ?? `Code ${code}`
+          reject(new Error(msg))
         }
       })
 
-      // Give FFmpeg up to 10 seconds to produce first frame before failing
-      setTimeout(() => {
+      // 15 s hard timeout — if no frame received, fail so user gets a clear error
+      const timeout = setTimeout(() => {
         if (!resolved) {
           resolved = true
-          resolve() // Don't reject — let it keep trying (camera may be slow)
+          proc.kill()
+          server.close()
+          reject(new Error('Timeout — no video received after 15s. Check IP, port, and credentials.'))
         }
-      }, 10000)
+      }, 15000)
+
+      // Clear timeout once we're streaming
+      proc.stdout?.once('data', () => clearTimeout(timeout))
     })
 
     server.on('error', (err) => reject(err))
