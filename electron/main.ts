@@ -242,7 +242,13 @@ startCam(currentFacing).then(connect).catch(e => {
 interface IpCameraEntry {
   id: string
   label: string
-  rtspUrl: string
+  rtspUrl: string   // original URL as provided by user (may have percent-encoded creds)
+  /** Decoded username (empty string if none) */
+  rtspUser: string
+  /** Decoded password (empty string if none) */
+  rtspPass: string
+  /** RTSP URL with credentials stripped — credentials passed separately */
+  rtspBaseUrl: string
   port: number
   ffmpegProcess: ChildProcess | null
   server: http.Server | null
@@ -250,6 +256,22 @@ interface IpCameraEntry {
 
 const ipCameraMap = new Map<string, IpCameraEntry>()
 let nextMjpegPort = 18900 // Starting port for MJPEG HTTP servers
+
+/** Parse an RTSP URL and extract credentials + credential-free base URL. */
+function parseRtspUrl(rtspUrl: string): { user: string; pass: string; baseUrl: string } {
+  try {
+    const fake = rtspUrl.replace(/^rtsp:\/\//i, 'http://')
+    const u = new URL(fake)
+    const user = u.username ? decodeURIComponent(u.username) : ''
+    const pass = u.password ? decodeURIComponent(u.password) : ''
+    u.username = ''
+    u.password = ''
+    const baseUrl = u.toString().replace(/^http:\/\//, 'rtsp://')
+    return { user, pass, baseUrl }
+  } catch {
+    return { user: '', pass: '', baseUrl: rtspUrl }
+  }
+}
 
 async function startRtspProxy(entry: IpCameraEntry): Promise<void> {
   const ffmpegPath = await findFFmpeg()
@@ -285,11 +307,20 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
     })
 
     server.listen(entry.port, '127.0.0.1', () => {
+      // Build the FFmpeg input URL with raw (decoded) credentials embedded.
+      // Node's spawn() passes each arg as a separate process argument — no shell
+      // is involved, so special chars like @, %, # in the password are safe.
+      // FFmpeg uses the *last* @ as the auth separator, so a literal @ in the
+      // password works correctly: rtsp://user:p@ss@host/path → user=user, pass=p@ss
+      const inputUrl = entry.rtspUser
+        ? `rtsp://${entry.rtspUser}:${entry.rtspPass}@${entry.rtspBaseUrl.replace(/^rtsp:\/\//i, '')}`
+        : entry.rtspBaseUrl
+
       const args = [
-        '-loglevel', 'warning',
+        '-loglevel', 'error',
         '-rtsp_transport', transport,
         '-stimeout', '10000000',      // 10s socket timeout (microseconds)
-        '-i', entry.rtspUrl,
+        '-i', inputUrl,
         '-an',
         '-f', 'mjpeg',
         '-q:v', '5',
@@ -342,16 +373,18 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
           const stderr = stderrLog
           const msg =
             stderr.includes('401') || stderr.includes('Unauthorized')
-              ? 'Wrong username or password (401)'
-            : stderr.includes('Connection refused')
-              ? 'Connection refused — check IP and port'
-            : stderr.includes('No route to host') || stderr.includes('timed out') || stderr.includes('WSAETIMEDOUT')
-              ? 'Camera unreachable — check IP address'
+              ? 'Wrong username or password (401 Unauthorized)'
+            : stderr.includes('Connection refused') || stderr.includes('WSAECONNREFUSED')
+              ? 'Connection refused — check IP address and port 554'
+            : stderr.includes('No route to host') || stderr.includes('timed out') || stderr.includes('WSAETIMEDOUT') || stderr.includes('Network is unreachable')
+              ? 'Camera unreachable — check IP address and network'
             : stderr.includes('Invalid data') || stderr.includes('moov atom')
               ? 'Camera connected but stream format not supported'
-            : stderr.match(/rtsp:\/\/[^ ]+: ([^\n]+)/)?.[1]   // extract FFmpeg's own message
-              ?? stderr.split('\n').filter(Boolean).pop()       // last non-empty line
-              ?? `Code ${code}`
+            : stderr.includes('splitting') || stderr.includes('Option not found')
+              ? 'Bad URL format — check the RTSP URL. Try using the form (📡) instead of paste mode'
+            : stderr.match(/: ([^\n]+)$/m)?.[1]?.trim()        // last colon-delimited message
+              ?? stderr.split('\n').filter(l => l.trim()).pop() // last non-empty line
+              ?? `Exit code ${code}`
           reject(new Error(msg))
         }
       })
@@ -1441,7 +1474,8 @@ ipcMain.handle('controller-open-pptx', async () => {
 ipcMain.handle('ip-camera-add', async (_event, { id, label, rtspUrl }: { id: string; label: string; rtspUrl: string }) => {
   if (ipCameraMap.has(id)) return { success: false, error: 'Camera already added' }
   const port = nextMjpegPort++
-  const entry: IpCameraEntry = { id, label, rtspUrl, port, ffmpegProcess: null, server: null }
+  const { user, pass, baseUrl } = parseRtspUrl(rtspUrl)
+  const entry: IpCameraEntry = { id, label, rtspUrl, rtspUser: user, rtspPass: pass, rtspBaseUrl: baseUrl, port, ffmpegProcess: null, server: null }
   ipCameraMap.set(id, entry)
   try {
     await startRtspProxy(entry)
