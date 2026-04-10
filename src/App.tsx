@@ -6,6 +6,7 @@ import { StreamControls } from './components/StreamControls'
 import { SettingsModal } from './components/SettingsModal'
 import { VideoOverlayWidget } from './components/VideoOverlayWidget'
 import { useCameras } from './hooks/useCameras'
+import { useIpCameras } from './hooks/useIpCameras'
 import { useStream } from './hooks/useStream'
 import { useSlides } from './hooks/useSlides'
 import { AppSettings, OverlaySettings, LogoSettings, CameraFallbackSettings, VideoOverlaySettings } from './types'
@@ -89,6 +90,9 @@ function App() {
   const [selectedDisplayId, setSelectedDisplayId] = useState<number | undefined>(undefined)
 
   const cameras = useCameras()
+  const ipCameras = useIpCameras()
+  const [activeIpCameraId, setActiveIpCameraId] = useState<string | null>(null)
+  const activeIpCamera = ipCameras.ipCameras.find(c => c.id === activeIpCameraId) ?? null
   const stream = useStream()
   const slides = useSlides()
   // Stable ref — VideoOverlayWidget calls onReady(setVideoEl) once on mount.
@@ -572,7 +576,7 @@ function App() {
             cameras={cameras.cameras}
             activeCamera={cameras.activeCamera}
             activeCameraStream={cameras.activeCameraStream}
-            onSelectCamera={cameras.selectCamera}
+            onSelectCamera={cam => { setActiveIpCameraId(null); cameras.selectCamera(cam) }}
             onRefresh={cameras.refreshCameras}
             onRemoveCamera={cameras.removeCamera}
             onReorderCameras={cameras.reorderCameras}
@@ -586,13 +590,20 @@ function App() {
             disconnectedIds={cameras.disconnectedIds}
             switchTransition={switchTransition}
             onSwitchTransitionChange={setSwitchTransition}
+            ipCameras={ipCameras.ipCameras}
+            activeIpCamera={activeIpCamera}
+            onSelectIpCamera={cam => setActiveIpCameraId(cam.id)}
+            onAddIpCamera={ipCameras.addIpCamera}
+            onRemoveIpCamera={id => { ipCameras.removeIpCamera(id); if (activeIpCameraId === id) setActiveIpCameraId(null) }}
+            onRestartIpCamera={ipCameras.restartIpCamera}
           />
         </div>
 
         {/* Center: Main Preview */}
         <div className="app-main__center">
           <MainPreview
-            cameraDeviceId={cameras.activeCamera?.deviceId || ''}
+            cameraDeviceId={activeIpCamera ? '' : (cameras.activeCamera?.deviceId || '')}
+            ipCameraMjpegUrl={activeIpCamera?.mjpegUrl}
             overlaySettings={overlaySettings}
             logoSettings={logoSettings}
             cameraFallback={cameraFallback}

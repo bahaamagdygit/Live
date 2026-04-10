@@ -67,6 +67,11 @@ interface ElectronAPI {
   // Video overlay IPC
   syncVideoOverlay?: (msg: any) => void
   onVideoOverlaySync?: (callback: (msg: any) => void) => () => void
+  // IP Camera (RTSP → MJPEG proxy)
+  ipCameraAdd?: (id: string, label: string, rtspUrl: string) => Promise<{ success: boolean; port?: number; error?: string }>
+  ipCameraRemove?: (id: string) => Promise<{ success: boolean }>
+  ipCameraList?: () => Promise<{ success: boolean; cameras: Array<{ id: string; label: string; rtspUrl: string; port: number; active: boolean }> }>
+  ipCameraRestart?: (id: string) => Promise<{ success: boolean; error?: string }>
 }
 
 declare global {

@@ -1641,6 +1641,11 @@ kbd {
   color: #ff8891;
 }
 
+.alert--sm {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+}
+
 /* ====== FILE LIBRARY (right panel) ====== */
 
 .file-library {

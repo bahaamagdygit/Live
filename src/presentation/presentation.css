@@ -44,6 +44,13 @@
   transform-origin: center center;
 }
 
+/* IP camera MJPEG <img> — object-fit variants */
+.presentation-camera--ipcam { transform: none; }
+.presentation-camera--fit-cover    { object-fit: cover; }
+.presentation-camera--fit-contain  { object-fit: contain; }
+.presentation-camera--fit-fill     { object-fit: fill; }
+.presentation-camera--fit-none     { object-fit: none; }
+
 /* Camera switch transition states */
 .presentation-camera--switching-out {
   opacity: 0;

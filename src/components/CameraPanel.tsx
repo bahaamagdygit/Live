@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Camera } from '../types'
 import { CameraViewSettings, DEFAULT_CAM_VIEW } from '../hooks/useCameras'
+import { IpCamera } from '../hooks/useIpCameras'
 import { CameraSwitchTransition } from './MainPreview'
 
 interface CameraPanelProps {
@@ -21,6 +22,13 @@ interface CameraPanelProps {
   disconnectedIds: Set<string>
   switchTransition: CameraSwitchTransition
   onSwitchTransitionChange: (t: CameraSwitchTransition) => void
+  // IP cameras
+  ipCameras: IpCamera[]
+  activeIpCamera: IpCamera | null
+  onSelectIpCamera: (cam: IpCamera) => void
+  onAddIpCamera: (label: string, rtspUrl: string) => Promise<{ success: boolean; error?: string }>
+  onRemoveIpCamera: (id: string) => void
+  onRestartIpCamera: (id: string) => void
 }
 
 function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragOver, onClick, onRemove, onDragStart, onDragOver, onDrop }: {
@@ -93,12 +101,57 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragO
   )
 }
 
+function IpCameraCard({ cam, isActive, onSelect, onRemove, onRestart }: {
+  cam: IpCamera
+  isActive: boolean
+  onSelect: () => void
+  onRemove: (e: React.MouseEvent) => void
+  onRestart: (e: React.MouseEvent) => void
+}) {
+  const [imgError, setImgError] = useState(false)
+  // Re-try image when mjpegUrl changes
+  useEffect(() => { setImgError(false) }, [cam.mjpegUrl])
+
+  return (
+    <div
+      className={`camera-card ${isActive ? 'camera-card--active' : ''} ${imgError ? 'camera-card--disconnected' : ''}`}
+      onClick={imgError ? undefined : onSelect}
+      title={cam.rtspUrl}
+    >
+      <div className="camera-preview">
+        {imgError ? (
+          <div className="camera-preview__error">
+            <span className="icon">📡</span>
+            <span className="camera-preview__error-label">No signal</span>
+          </div>
+        ) : (
+          <img
+            src={cam.mjpegUrl}
+            className="camera-preview__video"
+            onError={() => setImgError(true)}
+            alt={cam.label}
+          />
+        )}
+        {isActive && !imgError && <div className="camera-preview__active-badge">LIVE</div>}
+        {imgError && <div className="camera-preview__disconnected-badge">OFFLINE</div>}
+      </div>
+      <div className="camera-card__info">
+        {isActive && !imgError && <span className="camera-card__dot" />}
+        <span className="camera-card__label" title={cam.label}>📡 {cam.label}</span>
+        <button type="button" className="camera-card__remove" onClick={onRestart} title="Reconnect">↺</button>
+        <button type="button" className="camera-card__remove" onClick={onRemove} title="Remove">×</button>
+      </div>
+    </div>
+  )
+}
+
 export function CameraPanel({
   cameras, activeCamera, activeCameraStream, onSelectCamera, onRefresh, onRemoveCamera,
   onReorderCameras, onAddCamera,
   isLoading, error, camView, onCamViewChange,
   manualFallback, onToggleManualFallback, disconnectedIds,
   switchTransition, onSwitchTransitionChange,
+  ipCameras, activeIpCamera, onSelectIpCamera, onAddIpCamera, onRemoveIpCamera, onRestartIpCamera,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -106,6 +159,12 @@ export function CameraPanel({
   const [addDeviceId, setAddDeviceId] = useState('')
   const [dragFromIdx, setDragFromIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  // IP camera add form
+  const [showIpForm, setShowIpForm] = useState(false)
+  const [ipLabel, setIpLabel] = useState('')
+  const [ipRtsp, setIpRtsp] = useState('')
+  const [ipAddError, setIpAddError] = useState<string | null>(null)
+  const [ipAdding, setIpAdding] = useState(false)
 
   const set = (patch: Partial<CameraViewSettings>) => onCamViewChange(patch)
   const reset = () => onCamViewChange({ ...DEFAULT_CAM_VIEW })
@@ -139,6 +198,22 @@ export function CameraPanel({
     setShowAddForm(false)
   }
 
+  const handleIpAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!ipRtsp.trim()) return
+    setIpAdding(true)
+    setIpAddError(null)
+    const res = await onAddIpCamera(ipLabel, ipRtsp)
+    setIpAdding(false)
+    if (res.success) {
+      setIpLabel('')
+      setIpRtsp('')
+      setShowIpForm(false)
+    } else {
+      setIpAddError(res.error ?? 'Failed to connect')
+    }
+  }
+
   return (
     <div className="panel camera-panel">
       <div className="panel__header">
@@ -164,8 +239,14 @@ export function CameraPanel({
             type="button"
             className={`btn btn--icon ${showAddForm ? 'btn--active' : ''}`}
             onClick={() => setShowAddForm(s => !s)}
-            title="Add camera manually"
+            title="Add USB camera manually"
           >＋</button>
+          <button
+            type="button"
+            className={`btn btn--icon ${showIpForm ? 'btn--active' : ''}`}
+            onClick={() => setShowIpForm(s => !s)}
+            title="Add IP / DVR camera (RTSP)"
+          >📡</button>
           <button type="button" className="btn btn--icon" onClick={onRefresh} title="Refresh cameras" disabled={isLoading}>
             {isLoading ? '⟳' : '↺'}
           </button>
@@ -233,6 +314,54 @@ export function CameraPanel({
             />
           ))}
         </div>
+
+        {/* ── Add IP Camera Form ── */}
+        {showIpForm && (
+          <form className="add-camera-form" onSubmit={handleIpAddSubmit}>
+            <div className="add-camera-form__row">
+              <input
+                className="add-camera-form__input"
+                type="text"
+                placeholder="Label (e.g. Front Door)"
+                value={ipLabel}
+                onChange={e => setIpLabel(e.target.value)}
+              />
+            </div>
+            <div className="add-camera-form__row">
+              <input
+                className="add-camera-form__input"
+                type="text"
+                placeholder="rtsp://user:pass@192.168.1.64/stream1"
+                value={ipRtsp}
+                onChange={e => setIpRtsp(e.target.value)}
+                required
+              />
+            </div>
+            {ipAddError && <div className="alert alert--error alert--sm">{ipAddError}</div>}
+            <div className="add-camera-form__actions">
+              <button type="submit" className="btn btn--primary btn--sm" disabled={!ipRtsp.trim() || ipAdding}>
+                {ipAdding ? 'Connecting…' : 'Connect'}
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setShowIpForm(false); setIpAddError(null) }}>Cancel</button>
+            </div>
+          </form>
+        )}
+
+        {/* ── IP Camera Cards ── */}
+        {ipCameras.length > 0 && (
+          <div className="camera-list">
+            {ipCameras.map(cam => (
+              <IpCameraCard
+                key={cam.id}
+                cam={cam}
+                isActive={activeIpCamera?.id === cam.id}
+                onSelect={() => onSelectIpCamera(cam)}
+                onRemove={e => { e.stopPropagation(); onRemoveIpCamera(cam.id) }}
+                onRestart={e => { e.stopPropagation(); onRestartIpCamera(cam.id) }}
+              />
+            ))}
+          </div>
+        )}
 
         {/* ── Camera Settings Panel ── */}
         {showSettings && activeCamera && (
@@ -345,9 +474,11 @@ export function CameraPanel({
 
       <div className="panel__footer">
         <div className="camera-status">
-          {activeCamera
-            ? <span className="status-text"><span className="dot dot--green" />{activeCamera.label}</span>
-            : <span className="status-text status-text--muted">No camera selected</span>
+          {activeIpCamera
+            ? <span className="status-text"><span className="dot dot--green" />📡 {activeIpCamera.label}</span>
+            : activeCamera
+              ? <span className="status-text"><span className="dot dot--green" />{activeCamera.label}</span>
+              : <span className="status-text status-text--muted">No camera selected</span>
           }
         </div>
       </div>

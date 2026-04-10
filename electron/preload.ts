@@ -88,4 +88,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('video-overlay-sync', listener)
     return () => ipcRenderer.removeListener('video-overlay-sync', listener)
   },
+  // IP Camera (RTSP → MJPEG proxy)
+  ipCameraAdd: (id: string, label: string, rtspUrl: string) => ipcRenderer.invoke('ip-camera-add', { id, label, rtspUrl }),
+  ipCameraRemove: (id: string) => ipcRenderer.invoke('ip-camera-remove', id),
+  ipCameraList: () => ipcRenderer.invoke('ip-camera-list'),
+  ipCameraRestart: (id: string) => ipcRenderer.invoke('ip-camera-restart', id),
 })

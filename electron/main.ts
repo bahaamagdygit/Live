@@ -8,6 +8,7 @@ import {
 } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import http from 'http'
 import { spawn, ChildProcess } from 'child_process'
 import { execSync } from 'child_process'
 import AdmZip from 'adm-zip'
@@ -56,6 +57,106 @@ let ffmpegStreamProcess: ChildProcess | null = null
 let ffmpegRecordProcess: ChildProcess | null = null
 let streamStartTime: number | null = null
 let streamTimer: NodeJS.Timeout | null = null
+
+// ── IP Camera (RTSP → MJPEG proxy) ───────────────────────────────────────────
+interface IpCameraEntry {
+  id: string
+  label: string
+  rtspUrl: string
+  port: number
+  ffmpegProcess: ChildProcess | null
+  server: http.Server | null
+}
+
+const ipCameraMap = new Map<string, IpCameraEntry>()
+let nextMjpegPort = 18900 // Starting port for MJPEG HTTP servers
+
+function startRtspProxy(entry: IpCameraEntry): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const ffmpegPath = findFFmpegSync()
+
+    // Each camera gets its own tiny HTTP server that serves MJPEG
+    const clients = new Set<http.ServerResponse>()
+
+    const server = http.createServer((_req, res) => {
+      res.writeHead(200, {
+        'Content-Type': 'multipart/x-mixed-replace; boundary=--mjpegboundary',
+        'Cache-Control': 'no-cache',
+        'Connection': 'close',
+      })
+      clients.add(res)
+      res.on('close', () => clients.delete(res))
+    })
+
+    server.listen(entry.port, '127.0.0.1', () => {
+      // FFmpeg: read RTSP, output MJPEG frames to stdout
+      const args = [
+        '-rtsp_transport', 'tcp',
+        '-i', entry.rtspUrl,
+        '-an',                   // no audio
+        '-f', 'mjpeg',
+        '-q:v', '5',
+        '-r', '15',              // 15 fps is enough for preview
+        'pipe:1',
+      ]
+
+      const proc = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'ignore'] })
+      entry.ffmpegProcess = proc
+      entry.server = server
+
+      let buffer = Buffer.alloc(0)
+      const SOI = Buffer.from([0xff, 0xd8])
+      const EOI = Buffer.from([0xff, 0xd9])
+
+      proc.stdout?.on('data', (chunk: Buffer) => {
+        buffer = Buffer.concat([buffer, chunk])
+        // Extract complete JPEG frames and push to all connected clients
+        let start = 0
+        while (true) {
+          const s = buffer.indexOf(SOI, start)
+          if (s === -1) break
+          const e = buffer.indexOf(EOI, s + 2)
+          if (e === -1) break
+          const frame = buffer.subarray(s, e + 2)
+          const header = `--mjpegboundary\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`
+          for (const client of clients) {
+            try { client.write(header); client.write(frame); client.write('\r\n') } catch {}
+          }
+          start = e + 2
+        }
+        buffer = start > 0 ? buffer.subarray(start) : buffer
+      })
+
+      proc.on('error', (err) => reject(err))
+      proc.on('spawn', () => resolve())
+    })
+
+    server.on('error', (err) => reject(err))
+  })
+}
+
+function stopRtspProxy(id: string) {
+  const entry = ipCameraMap.get(id)
+  if (!entry) return
+  try { entry.ffmpegProcess?.kill('SIGTERM') } catch {}
+  try { entry.server?.close() } catch {}
+  entry.ffmpegProcess = null
+  entry.server = null
+}
+
+// findFFmpegSync is the synchronous version used inside IP camera startup
+function findFFmpegSync(): string {
+  const candidates = [
+    'ffmpeg',
+    'C:\\ffmpeg\\bin\\ffmpeg.exe',
+    'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+    path.join(getAppPath(), 'resources', 'ffmpeg.exe'),
+  ]
+  for (const c of candidates) {
+    try { execSync(`"${c}" -version`, { stdio: 'ignore', timeout: 3000 }); return c } catch {}
+  }
+  return 'ffmpeg'
+}
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1' || !app.isPackaged
 
@@ -208,6 +309,8 @@ function stopAllProcesses() {
     clearInterval(streamTimer)
     streamTimer = null
   }
+  for (const id of ipCameraMap.keys()) stopRtspProxy(id)
+  ipCameraMap.clear()
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.close()
     presentationWindow = null
@@ -1075,6 +1178,51 @@ ipcMain.handle('controller-open-pptx', async () => {
     mainWindow.webContents.send('remote-open-pptx')
   }
   return { success: true }
+})
+
+// ── IP Camera IPC ─────────────────────────────────────────────────────────────
+
+ipcMain.handle('ip-camera-add', async (_event, { id, label, rtspUrl }: { id: string; label: string; rtspUrl: string }) => {
+  if (ipCameraMap.has(id)) return { success: false, error: 'Camera already added' }
+  const port = nextMjpegPort++
+  const entry: IpCameraEntry = { id, label, rtspUrl, port, ffmpegProcess: null, server: null }
+  ipCameraMap.set(id, entry)
+  try {
+    await startRtspProxy(entry)
+    return { success: true, port }
+  } catch (err: any) {
+    ipCameraMap.delete(id)
+    return { success: false, error: err.message }
+  }
+})
+
+ipcMain.handle('ip-camera-remove', async (_event, id: string) => {
+  stopRtspProxy(id)
+  ipCameraMap.delete(id)
+  return { success: true }
+})
+
+ipcMain.handle('ip-camera-list', async () => {
+  const cameras = Array.from(ipCameraMap.values()).map(e => ({
+    id: e.id,
+    label: e.label,
+    rtspUrl: e.rtspUrl,
+    port: e.port,
+    active: e.ffmpegProcess !== null,
+  }))
+  return { success: true, cameras }
+})
+
+ipcMain.handle('ip-camera-restart', async (_event, id: string) => {
+  const entry = ipCameraMap.get(id)
+  if (!entry) return { success: false, error: 'Camera not found' }
+  stopRtspProxy(id)
+  try {
+    await startRtspProxy(entry)
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
 })
 
 } // end registerIpcHandlers

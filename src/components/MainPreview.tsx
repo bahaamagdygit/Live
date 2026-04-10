@@ -7,6 +7,7 @@ export type CameraSwitchTransition = 'fade' | 'zoom' | 'slide-left' | 'slide-rig
 
 interface MainPreviewProps {
   cameraDeviceId: string
+  ipCameraMjpegUrl?: string
   overlaySettings: OverlaySettings
   logoSettings: LogoSettings
   cameraFallback: CameraFallbackSettings
@@ -44,6 +45,7 @@ VideoOverlayVideo.displayName = 'VideoOverlayVideo'
 
 export function MainPreview({
   cameraDeviceId,
+  ipCameraMjpegUrl,
   overlaySettings,
   logoSettings,
   cameraFallback,
@@ -209,25 +211,36 @@ export function MainPreview({
             : <div className="presentation-fallback presentation-fallback--default" />
         )}
 
-        {/* Camera feed */}
-        <video
-          ref={cameraVideoRef}
-          className={[
-            'presentation-camera',
-            switchTransition !== 'none' ? `presentation-camera--switch-${switchTransition}` : '',
-            isSwitching ? 'presentation-camera--switching-out' : '',
-          ].filter(Boolean).join(' ')}
-          autoPlay playsInline muted
-          style={{
-            objectFit: fit,
-            transform: isSwitching
-              ? undefined  // CSS class handles the transition transform
-              : `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
-            transformOrigin: 'center center',
-            filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
-            display: !showFallback ? 'block' : 'none',
-          }}
-        />
+        {/* USB camera feed */}
+        {!ipCameraMjpegUrl && (
+          <video
+            ref={cameraVideoRef}
+            className={[
+              'presentation-camera',
+              switchTransition !== 'none' ? `presentation-camera--switch-${switchTransition}` : '',
+              isSwitching ? 'presentation-camera--switching-out' : '',
+            ].filter(Boolean).join(' ')}
+            autoPlay playsInline muted
+            style={{
+              objectFit: fit,
+              transform: isSwitching
+                ? undefined
+                : `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
+              transformOrigin: 'center center',
+              filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
+              display: !showFallback ? 'block' : 'none',
+            }}
+          />
+        )}
+
+        {/* IP camera MJPEG feed */}
+        {ipCameraMjpegUrl && !showFallback && (
+          <img
+            src={ipCameraMjpegUrl}
+            className={`presentation-camera presentation-camera--ipcam presentation-camera--fit-${fit}`}
+            alt="IP Camera"
+          />
+        )}
 
         {/* Video overlay — isolated memo component, never re-renders, hook owns all CSS */}
         <VideoOverlayVideo onMount={videoElMountRef?.current ?? undefined} />
