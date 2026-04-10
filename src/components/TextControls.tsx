@@ -28,12 +28,19 @@ export function TextControls({
   const [line2, setLine2] = useState('')
   const [isManual, setIsManual] = useState(false)
 
+  const slideParts = currentSlideText.split('\n')
+  const slideLine1 = slideParts[0] || ''
+  const slideLine2 = slideParts[1] || ''
+
+  const line1Changed = isManual && line1 !== slideLine1
+  const line2Changed = isManual && line2 !== slideLine2
+  const anyChanged = line1Changed || line2Changed
+
   // Sync with current slide text when not in manual mode
   useEffect(() => {
     if (!isManual) {
-      const parts = currentSlideText.split('\n')
-      setLine1(parts[0] || '')
-      setLine2(parts[1] || '')
+      setLine1(slideLine1)
+      setLine2(slideLine2)
     }
   }, [currentSlideText, isManual])
 
@@ -53,11 +60,10 @@ export function TextControls({
     emitChange(line1, e.target.value)
   }
 
-  const handleSyncSlide = () => {
+  const handleReset = () => {
     setIsManual(false)
-    const parts = currentSlideText.split('\n')
-    setLine1(parts[0] || '')
-    setLine2(parts[1] || '')
+    setLine1(slideLine1)
+    setLine2(slideLine2)
     onTextChange(currentSlideText)
   }
 
@@ -102,9 +108,12 @@ export function TextControls({
       <div className="text-controls__center">
         <div className="text-controls__lines">
           <div className="text-controls__line-row">
-            <span className="text-controls__line-label">Line 1</span>
+            <span className="text-controls__line-label">
+              Line 1
+              {line1Changed && <span className="text-controls__change-dot" title="Modified — differs from slide" />}
+            </span>
             <input
-              className={`text-controls__line-input${isManual ? ' text-controls__line-input--manual' : ''}`}
+              className={`text-controls__line-input${line1Changed ? ' text-controls__line-input--manual' : ''}`}
               type="text"
               value={line1}
               onChange={handleLine1Change}
@@ -112,21 +121,32 @@ export function TextControls({
             />
           </div>
           <div className="text-controls__line-row">
-            <span className="text-controls__line-label">Line 2</span>
+            <span className="text-controls__line-label">
+              Line 2
+              {line2Changed && <span className="text-controls__change-dot" title="Modified — differs from slide" />}
+            </span>
             <input
-              className={`text-controls__line-input${isManual ? ' text-controls__line-input--manual' : ''}`}
+              className={`text-controls__line-input${line2Changed ? ' text-controls__line-input--manual' : ''}`}
               type="text"
               value={line2}
               onChange={handleLine2Change}
               placeholder="Second line..."
             />
           </div>
-          {isManual && (
-            <button type="button" className="text-controls__sync-btn" onClick={handleSyncSlide}>
-              ↩ Use Slide Text
-            </button>
-          )}
         </div>
+      </div>
+
+      {/* Reset button — shown when any line differs from slide */}
+      <div className="text-controls__reset-col">
+        <button
+          type="button"
+          className={`text-controls__reset-btn${anyChanged ? ' text-controls__reset-btn--active' : ''}`}
+          onClick={handleReset}
+          disabled={!anyChanged}
+          title="Reset to slide text"
+        >
+          ↺ Reset
+        </button>
       </div>
 
       <div className="text-controls__right">
