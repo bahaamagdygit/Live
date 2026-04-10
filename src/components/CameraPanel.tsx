@@ -184,24 +184,22 @@ export function CameraPanel({
   const [showMobileQr, setShowMobileQr] = useState(false)
 
   // Build RTSP URL from structured fields.
-  // Pass credentials raw — FFmpeg handles them directly, no URL-encoding needed.
+  // Credentials are percent-encoded so special chars (@, #, %, etc.) don't break the URL.
   const buildRtspUrl = () => {
     if (ipPasteMode) return ipPasteUrl.trim()
-    const auth = ipUser ? `${ipUser}:${ipPass}@` : ''
+    const enc = (s: string) => encodeURIComponent(s)   // encode each part individually
+    const auth = ipUser ? `${enc(ipUser)}:${enc(ipPass)}@` : ''
     const port = ipPort || '554'
-    // channel number + stream digit, e.g. channel=1 main → "101", channel=2 sub → "202"
     const streamDigit = ipSubStream ? '2' : '1'
-    const chStream = `${ipChannel}${streamDigit}`   // matches OBS format: 101, 102, 201…
+    const chStream = `${ipChannel}${streamDigit}`   // OBS format: 101 = ch1 main, 102 = ch1 sub
 
     if (ipBrand === 'hilook' || ipBrand === 'hikvision') {
-      // Same path OBS uses — no ISAPI prefix
       return `rtsp://${auth}${ipHost}:${port}/Streaming/Channels/${chStream}`
     }
     if (ipBrand === 'dahua') {
       const subtype = ipSubStream ? 1 : 0
       return `rtsp://${auth}${ipHost}:${port}/cam/realmonitor?channel=${ipChannel}&subtype=${subtype}`
     }
-    // Generic
     return `rtsp://${auth}${ipHost}:${port}/Streaming/Channels/${chStream}`
   }
 
