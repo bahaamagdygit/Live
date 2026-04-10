@@ -9,9 +9,12 @@ import {
 import path from 'path'
 import fs from 'fs'
 import http from 'http'
+import { networkInterfaces } from 'os'
 import { spawn, ChildProcess } from 'child_process'
 import { execSync } from 'child_process'
 import AdmZip from 'adm-zip'
+import { WebSocketServer } from 'ws'
+import QRCode from 'qrcode'
 
 // We use dynamic require for electron-store and officeparser to avoid ESM issues
 let Store: any
@@ -57,6 +60,183 @@ let ffmpegStreamProcess: ChildProcess | null = null
 let ffmpegRecordProcess: ChildProcess | null = null
 let streamStartTime: number | null = null
 let streamTimer: NodeJS.Timeout | null = null
+
+// ── Mobile Camera (WebSocket → MJPEG) ────────────────────────────────────────
+const MOBILE_CAM_HTTP_PORT = 18800   // MJPEG stream consumed by the renderer
+const MOBILE_CAM_WS_PORT   = 18801   // Phone connects here and sends JPEG frames
+const MOBILE_CAM_PAGE_PORT = 18802   // Tiny HTTP server serving the phone web page
+
+let mobileCamHttpServer: http.Server | null = null
+let mobileCamWsServer: WebSocketServer | null = null
+let mobileCamPageServer: http.Server | null = null
+let mobileCamClients = new Set<http.ServerResponse>()
+
+function getLocalIp(): string {
+  const { networkInterfaces } = require('os')
+  const nets = networkInterfaces()
+  for (const ifaces of Object.values(nets) as any[]) {
+    for (const iface of ifaces) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address
+    }
+  }
+  return '127.0.0.1'
+}
+
+function getMobileCamUrls() {
+  const ip = getLocalIp()
+  return {
+    mjpegUrl: `http://127.0.0.1:${MOBILE_CAM_HTTP_PORT}/`,
+    phoneUrl: `http://${ip}:${MOBILE_CAM_PAGE_PORT}/`,
+    wsUrl:    `ws://${ip}:${MOBILE_CAM_WS_PORT}/`,
+  }
+}
+
+function startMobileCamServers() {
+  if (mobileCamHttpServer) return   // already running
+
+  // 1) MJPEG server — renderer reads this as <img src="...">
+  mobileCamHttpServer = http.createServer((_req, res) => {
+    res.writeHead(200, {
+      'Content-Type': 'multipart/x-mixed-replace; boundary=--mjpegboundary',
+      'Cache-Control': 'no-cache',
+      'Connection':    'close',
+      'Access-Control-Allow-Origin': '*',
+    })
+    mobileCamClients.add(res)
+    res.on('close', () => mobileCamClients.delete(res))
+  })
+  mobileCamHttpServer.listen(MOBILE_CAM_HTTP_PORT, '127.0.0.1')
+
+  // 2) WebSocket server — phone sends raw JPEG binary frames
+  mobileCamWsServer = new WebSocketServer({ port: MOBILE_CAM_WS_PORT })
+  mobileCamWsServer.on('connection', (ws) => {
+    ws.binaryType = 'nodebuffer'
+    ws.on('message', (data: Buffer) => {
+      // data is a JPEG frame from the phone
+      const header = `--mjpegboundary\r\nContent-Type: image/jpeg\r\nContent-Length: ${data.length}\r\n\r\n`
+      for (const client of mobileCamClients) {
+        try { client.write(header); client.write(data); client.write('\r\n') } catch {}
+      }
+    })
+    ws.on('error', () => {})
+  })
+
+  // 3) Page server — serves the mobile HTML page to the phone
+  mobileCamPageServer = http.createServer((_req, res) => {
+    const wsUrl = getMobileCamUrls().wsUrl
+    const html = buildMobilePage(wsUrl)
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end(html)
+  })
+  mobileCamPageServer.listen(MOBILE_CAM_PAGE_PORT, '0.0.0.0')
+}
+
+function stopMobileCamServers() {
+  mobileCamClients.forEach(c => { try { c.end() } catch {} })
+  mobileCamClients.clear()
+  mobileCamWsServer?.clients.forEach(c => { try { c.close() } catch {} })
+  mobileCamWsServer?.close()
+  mobileCamHttpServer?.close()
+  mobileCamPageServer?.close()
+  mobileCamHttpServer = null
+  mobileCamWsServer   = null
+  mobileCamPageServer = null
+}
+
+function buildMobilePage(wsUrl: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Church Live — Mobile Camera</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0a12;color:#fff;font-family:system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px}
+  h2{font-size:18px;font-weight:700;color:#818cf8}
+  video{width:100%;max-width:400px;border-radius:12px;background:#000;aspect-ratio:16/9;object-fit:cover}
+  .status{font-size:13px;padding:6px 14px;border-radius:20px;background:#1e1e2e;border:1px solid #2a2a40}
+  .status.connected{border-color:#22c55e;color:#22c55e}
+  .status.error{border-color:#ef4444;color:#ef4444}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  button{padding:10px 20px;border-radius:8px;border:none;font-size:14px;font-weight:600;cursor:pointer;background:#4f46e5;color:#fff}
+  button.secondary{background:#1e1e2e;border:1px solid #2a2a40;color:#a0a0c0}
+  select{padding:8px 12px;border-radius:8px;background:#1e1e2e;border:1px solid #2a2a40;color:#fff;font-size:14px}
+</style>
+</head>
+<body>
+<h2>📱 Mobile Camera</h2>
+<video id="v" autoplay playsinline muted></video>
+<div class="status" id="st">Connecting...</div>
+<div class="btns">
+  <select id="faceSel">
+    <option value="environment">Back Camera</option>
+    <option value="user">Front Camera</option>
+  </select>
+  <button onclick="flipCam()">🔄 Flip</button>
+  <button class="secondary" onclick="setQuality('high')">HD</button>
+  <button class="secondary" onclick="setQuality('low')">SD</button>
+</div>
+<script>
+const WS_URL = '${wsUrl}'
+const video  = document.getElementById('v')
+const st     = document.getElementById('st')
+const faceSel = document.getElementById('faceSel')
+let ws, canvas, ctx, timer, currentFacing = 'environment', quality = 'high'
+
+const QUALITY = { high:{w:1280,h:720,fps:20,jpegQ:0.75}, low:{w:640,h:360,fps:10,jpegQ:0.6} }
+
+async function startCam(facing) {
+  currentFacing = facing
+  if (video.srcObject) video.srcObject.getTracks().forEach(t=>t.stop())
+  const q = QUALITY[quality]
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:facing,width:{ideal:q.w},height:{ideal:q.h},frameRate:{ideal:q.fps}},
+    audio:false
+  })
+  video.srcObject = stream
+  canvas = document.createElement('canvas')
+  canvas.width = q.w; canvas.height = q.h
+  ctx = canvas.getContext('2d')
+}
+
+function connect() {
+  ws = new WebSocket(WS_URL)
+  ws.binaryType = 'arraybuffer'
+  ws.onopen = () => {
+    st.textContent = '🟢 Connected'; st.className = 'status connected'
+    const q = QUALITY[quality]
+    clearInterval(timer)
+    timer = setInterval(() => {
+      if (ws.readyState !== 1 || !ctx || video.readyState < 2) return
+      ctx.drawImage(video, 0, 0, q.w, q.h)
+      canvas.toBlob(blob => blob?.arrayBuffer().then(buf => {
+        if (ws.readyState === 1) ws.send(buf)
+      }), 'image/jpeg', q.jpegQ)
+    }, 1000 / q.fps)
+  }
+  ws.onclose = () => {
+    st.textContent = '🔴 Disconnected — retrying...'; st.className = 'status error'
+    clearInterval(timer); setTimeout(connect, 2000)
+  }
+  ws.onerror = () => ws.close()
+}
+
+function flipCam() {
+  const f = currentFacing === 'environment' ? 'user' : 'environment'
+  faceSel.value = f; startCam(f)
+}
+function setQuality(q) { quality = q; startCam(currentFacing) }
+faceSel.onchange = () => startCam(faceSel.value)
+
+startCam(currentFacing).then(connect).catch(e => {
+  st.textContent = 'Camera error: ' + e.message; st.className = 'status error'
+})
+</script>
+</body>
+</html>`
+}
 
 // ── IP Camera (RTSP → MJPEG proxy) ───────────────────────────────────────────
 interface IpCameraEntry {
@@ -356,6 +536,7 @@ function stopAllProcesses() {
   }
   for (const id of ipCameraMap.keys()) stopRtspProxy(id)
   ipCameraMap.clear()
+  stopMobileCamServers()
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.close()
     presentationWindow = null
@@ -1268,6 +1449,32 @@ ipcMain.handle('ip-camera-restart', async (_event, id: string) => {
   } catch (err: any) {
     return { success: false, error: err.message }
   }
+})
+
+// ── Mobile Camera IPC ─────────────────────────────────────────────────────────
+
+ipcMain.handle('mobile-cam-start', async () => {
+  try {
+    startMobileCamServers()
+    const urls = getMobileCamUrls()
+    const qrDataUrl = await QRCode.toDataURL(urls.phoneUrl, { width: 200, margin: 1 })
+    return { success: true, ...urls, qrDataUrl }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+})
+
+ipcMain.handle('mobile-cam-stop', async () => {
+  stopMobileCamServers()
+  return { success: true }
+})
+
+ipcMain.handle('mobile-cam-status', async () => {
+  const running = mobileCamHttpServer !== null
+  if (!running) return { running: false }
+  const urls = getMobileCamUrls()
+  const qrDataUrl = await QRCode.toDataURL(urls.phoneUrl, { width: 200, margin: 1 })
+  return { running: true, ...urls, qrDataUrl }
 })
 
 } // end registerIpcHandlers

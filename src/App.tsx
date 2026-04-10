@@ -92,7 +92,11 @@ function App() {
   const cameras = useCameras()
   const ipCameras = useIpCameras()
   const [activeIpCameraId, setActiveIpCameraId] = useState<string | null>(null)
-  const activeIpCamera = ipCameras.ipCameras.find(c => c.id === activeIpCameraId) ?? null
+  const [mobileCamMjpegUrl, setMobileCamMjpegUrl] = useState<string | null>(null)
+  // Active IP camera — also handles the virtual '__mobile__' entry
+  const activeIpCamera = activeIpCameraId === '__mobile__' && mobileCamMjpegUrl
+    ? { id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true, mjpegUrl: mobileCamMjpegUrl }
+    : ipCameras.ipCameras.find(c => c.id === activeIpCameraId) ?? null
   const stream = useStream()
   const slides = useSlides()
   // Stable ref — VideoOverlayWidget calls onReady(setVideoEl) once on mount.
@@ -596,6 +600,7 @@ function App() {
             onAddIpCamera={ipCameras.addIpCamera}
             onRemoveIpCamera={id => { ipCameras.removeIpCamera(id); if (activeIpCameraId === id) setActiveIpCameraId(null) }}
             onRestartIpCamera={ipCameras.restartIpCamera}
+            onMobileCamMjpegUrl={setMobileCamMjpegUrl}
           />
         </div>
 

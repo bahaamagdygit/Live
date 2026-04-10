@@ -29,6 +29,8 @@ interface CameraPanelProps {
   onAddIpCamera: (label: string, rtspUrl: string) => Promise<{ success: boolean; error?: string }>
   onRemoveIpCamera: (id: string) => void
   onRestartIpCamera: (id: string) => void
+  // Mobile camera
+  onMobileCamMjpegUrl: (url: string | null) => void
 }
 
 function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragOver, onClick, onRemove, onDragStart, onDragOver, onDrop }: {
@@ -152,6 +154,7 @@ export function CameraPanel({
   manualFallback, onToggleManualFallback, disconnectedIds,
   switchTransition, onSwitchTransitionChange,
   ipCameras, activeIpCamera, onSelectIpCamera, onAddIpCamera, onRemoveIpCamera, onRestartIpCamera,
+  onMobileCamMjpegUrl,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -171,6 +174,12 @@ export function CameraPanel({
   const [ipBrand, setIpBrand] = useState<'hilook' | 'hikvision' | 'dahua' | 'generic'>('hilook')
   const [ipAddError, setIpAddError] = useState<string | null>(null)
   const [ipAdding, setIpAdding] = useState(false)
+  // Mobile camera
+  const [mobileCamActive, setMobileCamActive] = useState(false)
+  const [mobileCamQr, setMobileCamQr] = useState<string | null>(null)
+  const [mobileCamPhoneUrl, setMobileCamPhoneUrl] = useState<string | null>(null)
+  const [mobileCamMjpegUrl, setMobileCamMjpegUrl] = useState<string | null>(null)
+  const [showMobileQr, setShowMobileQr] = useState(false)
 
   // Build RTSP URL from structured fields
   const buildRtspUrl = () => {
@@ -246,6 +255,29 @@ export function CameraPanel({
     }
   }
 
+  const handleMobileCamToggle = async () => {
+    if (!window.electronAPI) return
+    if (mobileCamActive) {
+      await window.electronAPI.mobileCamStop?.()
+      setMobileCamActive(false)
+      setMobileCamQr(null)
+      setMobileCamPhoneUrl(null)
+      setMobileCamMjpegUrl(null)
+      setShowMobileQr(false)
+      onMobileCamMjpegUrl(null)
+    } else {
+      const res = await window.electronAPI.mobileCamStart?.()
+      if (res?.success) {
+        setMobileCamActive(true)
+        setMobileCamQr(res.qrDataUrl ?? null)
+        setMobileCamPhoneUrl(res.phoneUrl ?? null)
+        setMobileCamMjpegUrl(res.mjpegUrl ?? null)
+        setShowMobileQr(true)
+        onMobileCamMjpegUrl(res.mjpegUrl ?? null)
+      }
+    }
+  }
+
   return (
     <div className="panel camera-panel">
       <div className="panel__header">
@@ -279,6 +311,12 @@ export function CameraPanel({
             onClick={() => setShowIpForm(s => !s)}
             title="Add IP / DVR camera (RTSP)"
           >📡</button>
+          <button
+            type="button"
+            className={`btn btn--icon ${mobileCamActive ? 'btn--active' : ''}`}
+            onClick={handleMobileCamToggle}
+            title={mobileCamActive ? 'Stop mobile camera' : 'Add mobile phone camera'}
+          >📱</button>
           <button type="button" className="btn btn--icon" onClick={onRefresh} title="Refresh cameras" disabled={isLoading}>
             {isLoading ? '⟳' : '↺'}
           </button>
@@ -287,6 +325,55 @@ export function CameraPanel({
 
       <div className="panel__content">
         {error && <div className="alert alert--error"><span>⚠️</span> {error}</div>}
+
+        {/* ── Mobile Camera QR Modal ── */}
+        {showMobileQr && mobileCamQr && (
+          <div className="mobile-qr-card">
+            <div className="mobile-qr-card__header">
+              <span>📱 Mobile Camera</span>
+              <button type="button" className="mobile-qr-card__close" onClick={() => setShowMobileQr(false)}>✕</button>
+            </div>
+            <p className="mobile-qr-card__hint">Scan with your phone to stream camera</p>
+            <img src={mobileCamQr} className="mobile-qr-card__qr" alt="QR Code" />
+            <div className="mobile-qr-card__url" title={mobileCamPhoneUrl ?? ''}>
+              {mobileCamPhoneUrl}
+            </div>
+            <div className="mobile-qr-card__actions">
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() => {
+                  if (mobileCamMjpegUrl) onSelectIpCamera({ id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true, mjpegUrl: mobileCamMjpegUrl })
+                  setShowMobileQr(false)
+                }}
+              >Use as Active Camera</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Mobile Camera live card (when active and QR dismissed) ── */}
+        {mobileCamActive && !showMobileQr && mobileCamMjpegUrl && (
+          <div className="camera-list">
+            <div
+              className={`camera-card ${activeIpCamera?.id === '__mobile__' ? 'camera-card--active' : ''}`}
+              onClick={() => onSelectIpCamera({ id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true, mjpegUrl: mobileCamMjpegUrl })}
+            >
+              <div className="camera-preview">
+                <img src={mobileCamMjpegUrl} className="camera-preview__video" alt="Mobile Camera"
+                  onError={() => {}} />
+                {activeIpCamera?.id === '__mobile__' && <div className="camera-preview__active-badge">LIVE</div>}
+              </div>
+              <div className="camera-card__info">
+                {activeIpCamera?.id === '__mobile__' && <span className="camera-card__dot" />}
+                <span className="camera-card__label">📱 Mobile Camera</span>
+                <button type="button" className="camera-card__remove" title="Show QR"
+                  onClick={e => { e.stopPropagation(); setShowMobileQr(true) }}>QR</button>
+                <button type="button" className="camera-card__remove" title="Stop"
+                  onClick={e => { e.stopPropagation(); handleMobileCamToggle() }}>×</button>
+              </div>
+            </div>
+          </div>
+        )}
         {!error && cameras.length === 0 && !isLoading && (
           <div className="empty-state">
             <div className="empty-state__icon">📷</div>
