@@ -168,16 +168,28 @@ export function CameraPanel({
   const [ipPass, setIpPass] = useState('')
   const [ipChannel, setIpChannel] = useState('1')
   const [ipSubStream, setIpSubStream] = useState(false)
+  const [ipBrand, setIpBrand] = useState<'hilook' | 'hikvision' | 'dahua' | 'generic'>('hilook')
   const [ipAddError, setIpAddError] = useState<string | null>(null)
   const [ipAdding, setIpAdding] = useState(false)
 
-  // Build RTSP URL from structured fields (Hikvision / generic format)
+  // Build RTSP URL from structured fields
   const buildRtspUrl = () => {
     const auth = ipUser ? `${encodeURIComponent(ipUser)}:${encodeURIComponent(ipPass)}@` : ''
-    const port = ipPort && ipPort !== '554' ? `:${ipPort}` : ''
+    const port = ipPort || '554'
+    const ch = ipChannel.padStart(2, '0')
     const stream = ipSubStream ? '02' : '01'
-    // Hikvision DVR path: /Streaming/Channels/<channel><stream>
-    return `rtsp://${auth}${ipHost}${port}/Streaming/Channels/${ipChannel.padStart(2, '0')}${stream}`
+
+    if (ipBrand === 'hilook' || ipBrand === 'hikvision') {
+      // HiLook & Hikvision both use the ISAPI path
+      return `rtsp://${auth}${ipHost}:${port}/ISAPI/Streaming/Channels/${ch}${stream}`
+    }
+    if (ipBrand === 'dahua') {
+      // Dahua: rtsp://user:pass@ip:554/cam/realmonitor?channel=1&subtype=0
+      const subtype = ipSubStream ? 1 : 0
+      return `rtsp://${auth}${ipHost}:${port}/cam/realmonitor?channel=${ipChannel}&subtype=${subtype}`
+    }
+    // Generic — bare path
+    return `rtsp://${auth}${ipHost}:${port}/Streaming/Channels/${ch}${stream}`
   }
 
   const set = (patch: Partial<CameraViewSettings>) => onCamViewChange(patch)
@@ -339,6 +351,22 @@ export function CameraPanel({
         {showIpForm && (
           <form className="ipcam-form" onSubmit={handleIpAddSubmit}>
             <div className="ipcam-form__title">📡 Add IP / DVR Camera</div>
+
+            <div className="ipcam-form__row">
+              <label className="ipcam-form__label">Brand / Type</label>
+              <div className="ipcam-form__brand-grid">
+                {(['hilook', 'hikvision', 'dahua', 'generic'] as const).map(b => (
+                  <button
+                    key={b}
+                    type="button"
+                    className={`ipcam-form__brand-btn ${ipBrand === b ? 'ipcam-form__brand-btn--on' : ''}`}
+                    onClick={() => setIpBrand(b)}
+                  >
+                    {b === 'hilook' ? 'HiLook' : b === 'hikvision' ? 'Hikvision' : b === 'dahua' ? 'Dahua' : 'Generic'}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="ipcam-form__row">
               <label className="ipcam-form__label">Camera Name</label>

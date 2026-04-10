@@ -571,6 +571,27 @@
   word-break: break-all;
   font-family: monospace;
 }
+.ipcam-form__brand-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.ipcam-form__brand-btn {
+  background: var(--color-bg-dark);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  padding: 4px 2px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.ipcam-form__brand-btn:hover { border-color: var(--color-accent); color: var(--color-text-primary); }
+.ipcam-form__brand-btn--on {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: rgba(99,102,241,0.12);
+}
 .ipcam-form__actions {
   display: flex;
   gap: 6px;

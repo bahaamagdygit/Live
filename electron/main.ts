@@ -73,7 +73,12 @@ let nextMjpegPort = 18900 // Starting port for MJPEG HTTP servers
 
 function startRtspProxy(entry: IpCameraEntry): Promise<void> {
   return new Promise((resolve, reject) => {
-    const ffmpegPath = findFFmpegSync()
+    let ffmpegPath: string
+    try {
+      ffmpegPath = findFFmpegSync()
+    } catch (err: any) {
+      return reject(err)
+    }
 
     // Each camera gets its own tiny HTTP server that serves MJPEG
     const clients = new Set<http.ServerResponse>()
@@ -100,15 +105,23 @@ function startRtspProxy(entry: IpCameraEntry): Promise<void> {
         'pipe:1',
       ]
 
-      const proc = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'ignore'] })
+      const proc = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
       entry.ffmpegProcess = proc
       entry.server = server
+
+      let resolved = false
+      let stderrLog = ''
+
+      proc.stderr?.on('data', (chunk: Buffer) => {
+        stderrLog += chunk.toString()
+      })
 
       let buffer = Buffer.alloc(0)
       const SOI = Buffer.from([0xff, 0xd8])
       const EOI = Buffer.from([0xff, 0xd9])
 
       proc.stdout?.on('data', (chunk: Buffer) => {
+        if (!resolved) { resolved = true; resolve() }
         buffer = Buffer.concat([buffer, chunk])
         // Extract complete JPEG frames and push to all connected clients
         let start = 0
@@ -127,8 +140,28 @@ function startRtspProxy(entry: IpCameraEntry): Promise<void> {
         buffer = start > 0 ? buffer.subarray(start) : buffer
       })
 
-      proc.on('error', (err) => reject(err))
-      proc.on('spawn', () => resolve())
+      proc.on('error', (err) => {
+        if (!resolved) reject(err)
+      })
+
+      // If FFmpeg exits quickly with no output, it means connection failed
+      proc.on('exit', (code) => {
+        if (!resolved) {
+          const hint = stderrLog.includes('401') ? ' (Wrong username/password)'
+            : stderrLog.includes('Connection refused') ? ' (Camera refused connection)'
+            : stderrLog.includes('No route to host') || stderrLog.includes('Connection timed out') ? ' (Camera unreachable — check IP)'
+            : ''
+          reject(new Error(`Cannot connect to camera${hint}. Code: ${code}`))
+        }
+      })
+
+      // Give FFmpeg up to 10 seconds to produce first frame before failing
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true
+          resolve() // Don't reject — let it keep trying (camera may be slow)
+        }
+      }, 10000)
     })
 
     server.on('error', (err) => reject(err))
@@ -145,17 +178,28 @@ function stopRtspProxy(id: string) {
 }
 
 // findFFmpegSync is the synchronous version used inside IP camera startup
+// Returns the path or throws an error with instructions if not found.
 function findFFmpegSync(): string {
   const candidates = [
     'ffmpeg',
     'C:\\ffmpeg\\bin\\ffmpeg.exe',
     'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+    'C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe',
     path.join(getAppPath(), 'resources', 'ffmpeg.exe'),
+    path.join(getAppPath(), 'ffmpeg.exe'),
   ]
   for (const c of candidates) {
-    try { execSync(`"${c}" -version`, { stdio: 'ignore', timeout: 3000 }); return c } catch {}
+    try {
+      execSync(`"${c}" -version`, { stdio: 'ignore', timeout: 3000 })
+      return c
+    } catch {}
   }
-  return 'ffmpeg'
+  throw new Error(
+    'FFmpeg not found. Please install FFmpeg:\n' +
+    '1. Download from https://www.gyan.dev/ffmpeg/builds/ (ffmpeg-release-essentials.zip)\n' +
+    '2. Extract and copy ffmpeg.exe to C:\\ffmpeg\\bin\\\n' +
+    '3. Restart this application'
+  )
 }
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1' || !app.isPackaged
