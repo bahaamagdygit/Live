@@ -185,7 +185,8 @@ function findFFmpegSync(): string {
     'C:\\ffmpeg\\bin\\ffmpeg.exe',
     'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
     'C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe',
-    path.join(getAppPath(), 'resources', 'ffmpeg.exe'),
+    path.join(__dirname, '..', 'resources', 'ffmpeg.exe'),   // dev: electron/../resources/
+    path.join(getAppPath(), 'resources', 'ffmpeg.exe'),       // packaged
     path.join(getAppPath(), 'ffmpeg.exe'),
   ]
   for (const c of candidates) {
