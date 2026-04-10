@@ -307,13 +307,18 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
     })
 
     server.listen(entry.port, '127.0.0.1', () => {
-      // Build the FFmpeg input URL with raw (decoded) credentials embedded.
-      // Node's spawn() passes each arg as a separate process argument — no shell
-      // is involved, so special chars like @, %, # in the password are safe.
-      // FFmpeg uses the *last* @ as the auth separator, so a literal @ in the
-      // password works correctly: rtsp://user:p@ss@host/path → user=user, pass=p@ss
+      // Build the FFmpeg input URL with credentials.
+      // We must percent-encode chars that break URL structure (@, :, /) in user/pass.
+      // Node spawn() passes args raw (no shell), so % is safe to include literally.
+      // FFmpeg's URL parser supports percent-encoded credentials.
+      const safeEncode = (s: string) =>
+        s.replace(/%/g, '%25')   // % first (must be before other replacements)
+         .replace(/@/g, '%40')   // @ would be mistaken for auth separator
+         .replace(/:/g, '%3A')   // : would be mistaken for user:pass separator
+         .replace(/\?/g, '%3F')  // ? would start query string
+         .replace(/#/g, '%23')   // # would start fragment
       const inputUrl = entry.rtspUser
-        ? `rtsp://${entry.rtspUser}:${entry.rtspPass}@${entry.rtspBaseUrl.replace(/^rtsp:\/\//i, '')}`
+        ? `rtsp://${safeEncode(entry.rtspUser)}:${safeEncode(entry.rtspPass)}@${entry.rtspBaseUrl.replace(/^rtsp:\/\//i, '')}`
         : entry.rtspBaseUrl
 
       const args = [
@@ -381,7 +386,7 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
             : stderr.includes('Invalid data') || stderr.includes('moov atom')
               ? 'Camera connected but stream format not supported'
             : stderr.includes('splitting') || stderr.includes('Option not found')
-              ? 'Bad URL format — check the RTSP URL. Try using the form (📡) instead of paste mode'
+              ? 'FFmpeg could not parse the camera URL. Check the IP, port, and credentials'
             : stderr.match(/: ([^\n]+)$/m)?.[1]?.trim()        // last colon-delimited message
               ?? stderr.split('\n').filter(l => l.trim()).pop() // last non-empty line
               ?? `Exit code ${code}`
