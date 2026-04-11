@@ -39,6 +39,7 @@ export interface OverlaySettings {
   line2FontSize: number
   line2FontFamily: string
   line2TextColor: string
+  borderColor: string   // border tint color; '' = original gold
 }
 
 export interface LogoSettings {

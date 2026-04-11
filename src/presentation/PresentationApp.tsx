@@ -41,6 +41,7 @@ interface PresentationData {
   line2FontSize?: number
   line2FontFamily?: string
   line2TextColor?: string
+  borderColor?: string
 }
 
 // Self-contained video overlay for the presentation window.
@@ -421,6 +422,7 @@ export default function PresentationApp() {
           panelWidth={data.panelWidth ?? 100}
           panelHeight={data.panelHeight ?? 20}
           langs={data.langs}
+          borderColor={data.borderColor || ''}
         />
 
         {/* Slide counter (bottom right) */}
@@ -500,7 +502,7 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
   line2FontSize, line2FontFamily, line2TextColor,
   logoBase64, logoPosition, logoSize, logoOpacity, logoVisible, logoAnimation,
   panelLayout = 'full', panelWidth = 100, panelHeight = 20,
-  langs = [] }: {
+  langs = [], borderColor = '' }: {
     line1: string; line2: string; visible: boolean;
     fontSize: number; fontFamily: string; textColor: string; alignment: string;
     line1Bold: boolean; line2Bold: boolean;
@@ -511,6 +513,7 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
     panelWidth?: number;
     panelHeight?: number;
     langs?: string[];
+    borderColor?: string;
   }) {
   const particlesRef = useRef<HTMLDivElement>(null)
   const panelBodyRef = useRef<HTMLDivElement>(null)
@@ -548,6 +551,10 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
       <div className="church-vignette" />
       <div className="church-sweep" />
       <div className="church-sweep church-sweep-rev" />
+      <div
+        className="church-border-tint"
+        style={borderColor ? { filter: borderCssFilter(borderColor) } : undefined}
+      >
       <div className="church-particles" ref={particlesRef} />
       <svg className="church-svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -895,6 +902,7 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
           </g>
         </g>
       </svg>
+      </div>{/* end church-border-tint */}
 
       {/* ── Logo — position controlled ── */}
       {logoVisible && (
@@ -1074,6 +1082,49 @@ function hexToRgb(hex: string) {
   return result
     ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
     : null
+}
+
+// Returns a CSS filter string that recolors the gold border to any chosen hex color.
+function borderCssFilter(hex: string): string {
+  if (!hex) return ''
+  const rgb = hexToRgb(hex)
+  if (!rgb) return ''
+
+  const r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const lightness = (max + min) / 2
+  const saturation = max === min ? 0 : (max - min) / (1 - Math.abs(2 * lightness - 1))
+
+  // For very dark colors (black, dark gray): desaturate + dim
+  if (lightness < 0.15) {
+    const bri = Math.max(0.05, lightness * 1.5)
+    return `saturate(0) brightness(${bri.toFixed(2)})`
+  }
+
+  // For near-white: desaturate + brighten
+  if (lightness > 0.85 && saturation < 0.2) {
+    return `saturate(0) brightness(${(lightness * 1.4).toFixed(2)})`
+  }
+
+  // For low-saturation (gray) colors: desaturate and match brightness
+  if (saturation < 0.15) {
+    return `saturate(0) brightness(${(lightness * 1.2).toFixed(2)})`
+  }
+
+  // For vivid colors: sepia → hue-rotate → adjust saturation + brightness
+  let h = 0
+  if (max !== min) {
+    const d = max - min
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+    else if (max === g) h = ((b - r) / d + 2) / 6
+    else h = ((r - g) / d + 4) / 6
+  }
+  const targetHue = Math.round(h * 360)
+  const goldHue = 43
+  const rotate = targetHue - goldHue
+  const satMultiplier = Math.max(0.5, Math.min(4, saturation * 3))
+  const briMultiplier = Math.max(0.4, Math.min(1.5, lightness * 2))
+  return `sepia(1) hue-rotate(${rotate}deg) saturate(${satMultiplier.toFixed(2)}) brightness(${briMultiplier.toFixed(2)})`
 }
 
 function isRtl(text: string) {

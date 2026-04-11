@@ -200,6 +200,25 @@ export function TextControls({
           )}
         </div>
 
+        <div className="text-controls__layout-row">
+          <span className="text-controls__layout-label">Border</span>
+          <input
+            type="color"
+            className="text-controls__color-input"
+            value={overlaySettings.borderColor || '#f5e27a'}
+            onChange={e => onOverlayChange({ borderColor: e.target.value })}
+            title="Border color"
+          />
+          {overlaySettings.borderColor && (
+            <button
+              type="button"
+              className="text-controls__reset-color-btn"
+              onClick={() => onOverlayChange({ borderColor: '' })}
+              title="Reset to gold"
+            >↺</button>
+          )}
+        </div>
+
         <div className="text-controls__visibility">
           <button
             type="button"

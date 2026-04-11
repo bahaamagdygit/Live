@@ -38,6 +38,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     line2FontSize: 28,
     line2FontFamily: 'Arial',
     line2TextColor: '#ffffff',
+    borderColor: '',
   },
   logoSettings: {
     filePath: '',
