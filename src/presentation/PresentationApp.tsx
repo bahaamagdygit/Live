@@ -35,6 +35,8 @@ interface PresentationData {
   logoOpacity?: number
   logoVisible?: boolean
   logoAnimation?: 'none' | 'rotate-right' | 'rotate-left' | 'flip-y' | 'flip-x' | 'pulse' | 'bounce'
+  logoBgColor?: string
+  logoBgOpacity?: number
   panelLayout?: 'full' | 'left' | 'right'
   panelWidth?: number
   panelHeight?: number
@@ -423,6 +425,10 @@ export default function PresentationApp() {
           panelHeight={data.panelHeight ?? 20}
           langs={data.langs}
           borderColor={data.borderColor || ''}
+          bgColor={data.bgColor || '#000000'}
+          bgOpacity={data.bgOpacity ?? 70}
+          logoBgColor={data.logoBgColor || '#000000'}
+          logoBgOpacity={data.logoBgOpacity ?? 80}
         />
 
         {/* Slide counter (bottom right) */}
@@ -502,7 +508,8 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
   line2FontSize, line2FontFamily, line2TextColor,
   logoBase64, logoPosition, logoSize, logoOpacity, logoVisible, logoAnimation,
   panelLayout = 'full', panelWidth = 100, panelHeight = 20,
-  langs = [], borderColor = '' }: {
+  langs = [], borderColor = '', bgColor = '#000000', bgOpacity = 70,
+  logoBgColor = '#000000', logoBgOpacity = 80 }: {
     line1: string; line2: string; visible: boolean;
     fontSize: number; fontFamily: string; textColor: string; alignment: string;
     line1Bold: boolean; line2Bold: boolean;
@@ -514,6 +521,10 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
     panelHeight?: number;
     langs?: string[];
     borderColor?: string;
+    bgColor?: string;
+    bgOpacity?: number;
+    logoBgColor?: string;
+    logoBgOpacity?: number;
   }) {
   const particlesRef = useRef<HTMLDivElement>(null)
   const panelBodyRef = useRef<HTMLDivElement>(null)
@@ -912,7 +923,7 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
         >
           <div
             className="church-logo-body"
-            style={{ width: logoSize - 44, height: logoSize - 44, opacity: logoOpacity / 100 }}
+            style={{ width: logoSize - 44, height: logoSize - 44, opacity: logoOpacity / 100, background: logoBgColor ? `rgba(${hexToRgb(logoBgColor)?.r ?? 0},${hexToRgb(logoBgColor)?.g ?? 0},${hexToRgb(logoBgColor)?.b ?? 0},${(logoBgOpacity ?? 80) / 100})` : undefined }}
           >
             {logoBase64 ? (
               <img
@@ -968,7 +979,11 @@ export function ChurchBorderOverlay({ line1, line2, visible, fontSize, fontFamil
       >
         <div className="church-reading-topbar" />
         <div className="church-reading-midbar" />
-        <div className="church-reading-panel">
+        <div className="church-reading-panel" style={(() => {
+          const rgb = hexToRgb(bgColor)
+          if (!rgb) return undefined
+          return { background: `rgba(${rgb.r},${rgb.g},${rgb.b},${bgOpacity / 100})` }
+        })()}>
           {/* Left ornament */}
           <div className="church-panel-side church-panel-side--left">
             <svg viewBox="0 0 90 120" width="90" height="120" xmlns="http://www.w3.org/2000/svg">

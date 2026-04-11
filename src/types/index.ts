@@ -50,6 +50,8 @@ export interface LogoSettings {
   opacity: number
   visible: boolean
   animation: 'none' | 'rotate-right' | 'rotate-left' | 'flip-y' | 'flip-x' | 'pulse' | 'bounce'
+  bgColor: string    // logo circle background color
+  bgOpacity: number  // logo circle background opacity 0–100
 }
 
 export interface CameraFallbackSettings {

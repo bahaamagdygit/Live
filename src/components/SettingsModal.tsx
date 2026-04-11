@@ -543,6 +543,29 @@ export function SettingsModal({ isOpen, settings, onSave, onClose }: SettingsMod
 
               <div className="form-row">
                 <div className="form-group">
+                  <label className="form-label">BG Color</label>
+                  <input
+                    type="color"
+                    className="form-color"
+                    value={localSettings.logoSettings.bgColor || '#000000'}
+                    onChange={(e) => updateLogo({ bgColor: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">BG Opacity ({localSettings.logoSettings.bgOpacity ?? 80}%)</label>
+                  <input
+                    type="range"
+                    className="form-range"
+                    min={0}
+                    max={100}
+                    value={localSettings.logoSettings.bgOpacity ?? 80}
+                    onChange={(e) => updateLogo({ bgOpacity: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
                   <label className="form-label">Animation</label>
                   <select
                     className="form-select"

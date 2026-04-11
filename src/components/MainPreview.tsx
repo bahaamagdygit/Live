@@ -269,6 +269,10 @@ export function MainPreview({
           panelWidth={overlaySettings.panelWidth ?? 100}
           panelHeight={overlaySettings.panelHeight ?? 20}
           borderColor={overlaySettings.borderColor ?? ''}
+          bgColor={overlaySettings.bgColor}
+          bgOpacity={overlaySettings.bgOpacity}
+          logoBgColor={logoSettings.bgColor || '#000000'}
+          logoBgOpacity={logoSettings.bgOpacity ?? 80}
         />
       </div>
     </div>

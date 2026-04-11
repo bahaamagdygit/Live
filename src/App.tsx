@@ -47,6 +47,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     opacity: 80,
     visible: false,
     animation: 'none' as const,
+    bgColor: '#000000',
+    bgOpacity: 80,
   },
   cameraFallback: {
     filePath: '',
@@ -327,6 +329,8 @@ function App() {
       logoOpacity: logoSettings.opacity,
       logoVisible: logoSettings.visible,
       logoAnimation: logoSettings.animation,
+      logoBgColor: logoSettings.bgColor || '#000000',
+      logoBgOpacity: logoSettings.bgOpacity ?? 80,
       fallbackBase64: cameraFallback.base64 || '',
       fallbackFit: cameraFallback.fit,
       manualFallback,
@@ -484,6 +488,8 @@ function App() {
             opacity: updatedLogoSettings.opacity,
             visible: updatedLogoSettings.visible,
             animation: updatedLogoSettings.animation,
+            bgColor: updatedLogoSettings.bgColor || '#000000',
+            bgOpacity: updatedLogoSettings.bgOpacity ?? 80,
           },
           cameraFallback: {
             filePath: newSettings.cameraFallback.filePath,
