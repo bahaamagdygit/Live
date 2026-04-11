@@ -333,6 +333,9 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
         '-timeout', '10000000',        // 10s socket timeout (microseconds)
         '-i', inputUrl,
         '-an',
+        '-vf', 'scale=640:360',        // scale to fixed size — forces full decode of H.264/H.265
+        '-vcodec', 'mjpeg',            // explicit MJPEG encoder
+        '-pix_fmt', 'yuvj420p',        // standard MJPEG pixel format
         '-f', 'mjpeg',
         '-q:v', '5',
         '-r', '15',
