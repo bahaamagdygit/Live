@@ -330,7 +330,7 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
       const args = [
         '-loglevel', 'warning',
         '-rtsp_transport', transport,
-        '-stimeout', '10000000',      // 10s socket timeout (microseconds)
+        '-timeout', '10000000',        // 10s socket timeout (microseconds)
         '-i', inputUrl,
         '-an',
         '-f', 'mjpeg',
