@@ -5,25 +5,22 @@ import '../presentation/presentation.css'
 
 export type CameraSwitchTransition = 'fade' | 'zoom' | 'slide-left' | 'slide-right' | 'none'
 
+interface CamView {
+  scale: number; offsetX: number; offsetY: number
+  fit: 'cover' | 'contain' | 'fill' | 'none'
+  brightness: number; contrast: number; saturation: number
+  flipH: boolean; flipV: boolean
+}
 interface MainPreviewProps {
   cameraDeviceId: string
   ipCameraMjpegUrl?: string
+  ipCamView?: CamView
   overlaySettings: OverlaySettings
   logoSettings: LogoSettings
   cameraFallback: CameraFallbackSettings
   manualFallback?: boolean
   switchTransition?: CameraSwitchTransition
-  camView?: {
-    scale: number
-    offsetX: number
-    offsetY: number
-    fit: 'cover' | 'contain' | 'fill' | 'none'
-    brightness: number
-    contrast: number
-    saturation: number
-    flipH: boolean
-    flipV: boolean
-  }
+  camView?: CamView
   videoElMountRef?: React.RefObject<((el: HTMLVideoElement | null) => void) | undefined>
 }
 
@@ -52,6 +49,7 @@ export function MainPreview({
   manualFallback = false,
   switchTransition = 'zoom',
   camView,
+  ipCamView,
   videoElMountRef,
 }: MainPreviewProps) {
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
@@ -238,8 +236,13 @@ export function MainPreview({
         {ipCameraMjpegUrl && !showFallback && (
           <img
             src={ipCameraMjpegUrl}
-            className={`presentation-camera presentation-camera--ipcam presentation-camera--fit-${fit}`}
+            className={`presentation-camera presentation-camera--ipcam presentation-camera--fit-${ipCamView?.fit ?? 'cover'}`}
             alt="IP Camera"
+            style={{
+              transform: `scale(${(ipCamView?.scale ?? 100) / 100}) translate(${ipCamView?.offsetX ?? 0}%, ${ipCamView?.offsetY ?? 0}%) scaleX(${ipCamView?.flipH ? -1 : 1}) scaleY(${ipCamView?.flipV ? -1 : 1})`,
+              transformOrigin: 'center center',
+              filter: `brightness(${ipCamView?.brightness ?? 100}%) contrast(${ipCamView?.contrast ?? 100}%) saturate(${ipCamView?.saturation ?? 100}%)`,
+            }}
           />
         )}
 

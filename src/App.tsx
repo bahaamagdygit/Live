@@ -98,7 +98,7 @@ function App() {
   const [mobileCamMjpegUrl, setMobileCamMjpegUrl] = useState<string | null>(null)
   // Active IP camera — also handles the virtual '__mobile__' entry
   const activeIpCamera = activeIpCameraId === '__mobile__' && mobileCamMjpegUrl
-    ? { id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true, mjpegUrl: mobileCamMjpegUrl }
+    ? { id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true, mjpegUrl: mobileCamMjpegUrl, view: { scale: 100, offsetX: 0, offsetY: 0, fit: 'cover' as const, brightness: 100, contrast: 100, saturation: 100, flipH: false, flipV: false } }
     : ipCameras.ipCameras.find(c => c.id === activeIpCameraId) ?? null
   const stream = useStream()
   const slides = useSlides()
@@ -314,6 +314,15 @@ function App() {
       totalSlides: slides.slides.length,
       cameraDeviceId: activeIpCamera ? '' : (cameras.activeCamera?.deviceId || ''),
       ipCameraMjpegUrl: activeIpCamera?.mjpegUrl || '',
+      ipCamScale: activeIpCamera?.view.scale ?? 100,
+      ipCamX: activeIpCamera?.view.offsetX ?? 0,
+      ipCamY: activeIpCamera?.view.offsetY ?? 0,
+      ipCamFit: activeIpCamera?.view.fit ?? 'cover',
+      ipCamBrightness: activeIpCamera?.view.brightness ?? 100,
+      ipCamContrast: activeIpCamera?.view.contrast ?? 100,
+      ipCamSaturation: activeIpCamera?.view.saturation ?? 100,
+      ipCamFlipH: activeIpCamera?.view.flipH ?? false,
+      ipCamFlipV: activeIpCamera?.view.flipV ?? false,
       cameraScale: cameras.camView.scale,
       cameraX: cameras.camView.offsetX,
       cameraY: cameras.camView.offsetY,
@@ -426,6 +435,15 @@ function App() {
           totalSlides: slides.slides.length,
           cameraDeviceId: activeIpCamera ? '' : (cameras.activeCamera?.deviceId || ''),
           ipCameraMjpegUrl: activeIpCamera?.mjpegUrl || '',
+          ipCamScale: activeIpCamera?.view.scale ?? 100,
+          ipCamX: activeIpCamera?.view.offsetX ?? 0,
+          ipCamY: activeIpCamera?.view.offsetY ?? 0,
+          ipCamFit: activeIpCamera?.view.fit ?? 'cover',
+          ipCamBrightness: activeIpCamera?.view.brightness ?? 100,
+          ipCamContrast: activeIpCamera?.view.contrast ?? 100,
+          ipCamSaturation: activeIpCamera?.view.saturation ?? 100,
+          ipCamFlipH: activeIpCamera?.view.flipH ?? false,
+          ipCamFlipV: activeIpCamera?.view.flipV ?? false,
           cameraScale: cameras.camView.scale,
           cameraX: cameras.camView.offsetX,
           cameraY: cameras.camView.offsetY,
@@ -602,11 +620,15 @@ function App() {
             switchTransition={switchTransition}
             onSwitchTransitionChange={setSwitchTransition}
             ipCameras={ipCameras.ipCameras}
+            presets={ipCameras.presets}
             activeIpCamera={activeIpCamera}
             onSelectIpCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(cam.id) }}
             onAddIpCamera={ipCameras.addIpCamera}
             onRemoveIpCamera={id => { ipCameras.removeIpCamera(id); if (activeIpCameraId === id) setActiveIpCameraId(null) }}
             onRestartIpCamera={ipCameras.restartIpCamera}
+            onSavePreset={ipCameras.savePreset}
+            onDeletePreset={ipCameras.deletePreset}
+            onUpdateIpCamView={ipCameras.updateIpCamView}
             onMobileCamMjpegUrl={setMobileCamMjpegUrl}
           />
         </div>
@@ -616,6 +638,7 @@ function App() {
           <MainPreview
             cameraDeviceId={activeIpCamera ? '' : (cameras.activeCamera?.deviceId || '')}
             ipCameraMjpegUrl={activeIpCamera?.mjpegUrl}
+            ipCamView={activeIpCamera?.view}
             overlaySettings={overlaySettings}
             logoSettings={logoSettings}
             cameraFallback={cameraFallback}

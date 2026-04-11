@@ -60,11 +60,41 @@ export interface CameraFallbackSettings {
   fit: 'cover' | 'contain' | 'fill'
 }
 
+export interface IpCameraPreset {
+  id: string
+  label: string
+  host: string
+  port: string
+  user: string
+  pass: string
+  channel: string
+  subStream: boolean
+  brand: 'hilook' | 'hikvision' | 'dahua' | 'generic'
+}
+
+export interface IpCameraViewSettings {
+  scale: number
+  offsetX: number
+  offsetY: number
+  fit: 'cover' | 'contain' | 'fill' | 'none'
+  brightness: number
+  contrast: number
+  saturation: number
+  flipH: boolean
+  flipV: boolean
+}
+
+export const DEFAULT_IPCAM_VIEW: IpCameraViewSettings = {
+  scale: 100, offsetX: 0, offsetY: 0, fit: 'cover',
+  brightness: 100, contrast: 100, saturation: 100, flipH: false, flipV: false,
+}
+
 export interface AppSettings {
   streamConfig: StreamConfig
   overlaySettings: OverlaySettings
   logoSettings: LogoSettings
   cameraFallback: CameraFallbackSettings
+  ipCameraPresets?: IpCameraPreset[]
   hotkeys: {
     toggleText: string
     nextSlide: string

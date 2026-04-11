@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
-import { Camera } from '../types'
+import { Camera, IpCameraPreset, IpCameraViewSettings, DEFAULT_IPCAM_VIEW } from '../types'
 import { CameraViewSettings, DEFAULT_CAM_VIEW } from '../hooks/useCameras'
-import { IpCamera } from '../hooks/useIpCameras'
+import { IpCamera, buildRtspFromPreset } from '../hooks/useIpCameras'
 import { CameraSwitchTransition } from './MainPreview'
 
 interface CameraPanelProps {
@@ -24,11 +24,15 @@ interface CameraPanelProps {
   onSwitchTransitionChange: (t: CameraSwitchTransition) => void
   // IP cameras
   ipCameras: IpCamera[]
+  presets: IpCameraPreset[]
   activeIpCamera: IpCamera | null
   onSelectIpCamera: (cam: IpCamera) => void
-  onAddIpCamera: (label: string, rtspUrl: string) => Promise<{ success: boolean; error?: string }>
+  onAddIpCamera: (label: string, rtspUrl: string, preset?: IpCameraPreset) => Promise<{ success: boolean; error?: string }>
   onRemoveIpCamera: (id: string) => void
   onRestartIpCamera: (id: string) => void
+  onSavePreset: (preset: IpCameraPreset) => Promise<void>
+  onDeletePreset: (id: string) => void
+  onUpdateIpCamView: (id: string, patch: Partial<IpCameraViewSettings>) => void
   // Mobile camera
   onMobileCamMjpegUrl: (url: string | null) => void
 }
@@ -103,12 +107,13 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragO
   )
 }
 
-function IpCameraCard({ cam, isActive, onSelect, onRemove, onRestart }: {
+function IpCameraCard({ cam, isActive, onSelect, onRemove, onRestart, onSettings }: {
   cam: IpCamera
   isActive: boolean
   onSelect: () => void
   onRemove: (e: React.MouseEvent) => void
   onRestart: (e: React.MouseEvent) => void
+  onSettings: (e: React.MouseEvent) => void
 }) {
   const [imgError, setImgError] = useState(false)
   // Re-try image when mjpegUrl changes
@@ -140,6 +145,7 @@ function IpCameraCard({ cam, isActive, onSelect, onRemove, onRestart }: {
       <div className="camera-card__info">
         {isActive && !imgError && <span className="camera-card__dot" />}
         <span className="camera-card__label" title={cam.label}>📡 {cam.label}</span>
+        <button type="button" className="camera-card__remove" onClick={onSettings} title="Settings">⚙</button>
         <button type="button" className="camera-card__remove" onClick={onRestart} title="Reconnect">↺</button>
         <button type="button" className="camera-card__remove" onClick={onRemove} title="Remove">×</button>
       </div>
@@ -153,7 +159,8 @@ export function CameraPanel({
   isLoading, error, camView, onCamViewChange,
   manualFallback, onToggleManualFallback, disconnectedIds,
   switchTransition, onSwitchTransitionChange,
-  ipCameras, activeIpCamera, onSelectIpCamera, onAddIpCamera, onRemoveIpCamera, onRestartIpCamera,
+  ipCameras, presets, activeIpCamera, onSelectIpCamera, onAddIpCamera, onRemoveIpCamera, onRestartIpCamera,
+  onSavePreset, onDeletePreset, onUpdateIpCamView,
   onMobileCamMjpegUrl,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
@@ -177,6 +184,10 @@ export function CameraPanel({
   const [ipAddError, setIpAddError] = useState<string | null>(null)
   const [ipAdding, setIpAdding] = useState(false)
   const [ipDebugLog, setIpDebugLog] = useState<string[]>([])
+  // IP camera edit modal
+  const [editPreset, setEditPreset] = useState<IpCameraPreset | null>(null)
+  // IP camera settings (zoom/pan) — which camera is open
+  const [ipSettingsCamId, setIpSettingsCamId] = useState<string | null>(null)
   // Mobile camera
   const [mobileCamActive, setMobileCamActive] = useState(false)
   const [mobileCamQr, setMobileCamQr] = useState<string | null>(null)
@@ -565,18 +576,142 @@ export function CameraPanel({
           </form>
         )}
 
-        {/* ── IP Camera Cards ── */}
+        {/* ── Saved Presets ── */}
+        {presets.length > 0 && !showIpForm && (
+          <div className="ipcam-presets">
+            <div className="ipcam-presets__title">Saved Cameras</div>
+            {presets.map(preset => {
+              const live = ipCameras.find(c => c.preset?.id === preset.id)
+              return (
+                <div key={preset.id} className="ipcam-preset-row">
+                  <span className="ipcam-preset-row__label">{preset.label}</span>
+                  <span className="ipcam-preset-row__host">{preset.host}</span>
+                  <button type="button" className="ipcam-preset-row__btn" title="Edit"
+                    onClick={() => setEditPreset({ ...preset })}>✏️</button>
+                  {live
+                    ? <button type="button" className="ipcam-preset-row__btn ipcam-preset-row__btn--live" title="Disconnect"
+                        onClick={() => onRemoveIpCamera(live.id)}>■ Stop</button>
+                    : <button type="button" className="ipcam-preset-row__btn ipcam-preset-row__btn--connect" title="Connect"
+                        onClick={async () => {
+                          const url = buildRtspFromPreset(preset)
+                          await onAddIpCamera(preset.label, url, preset)
+                        }}>▶ Connect</button>
+                  }
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── Edit Preset Modal ── */}
+        {editPreset && (
+          <div className="ipcam-edit-modal">
+            <div className="ipcam-edit-modal__title">Edit Camera</div>
+            <div className="ipcam-form__grid2">
+              <div>
+                <label className="ipcam-form__label">Name</label>
+                <input title="Camera name" className="ipcam-form__input" value={editPreset.label}
+                  onChange={e => setEditPreset(p => p ? { ...p, label: e.target.value } : p)} />
+              </div>
+              <div>
+                <label className="ipcam-form__label">IP Address</label>
+                <input title="IP address" className="ipcam-form__input" value={editPreset.host}
+                  onChange={e => setEditPreset(p => p ? { ...p, host: e.target.value } : p)} />
+              </div>
+              <div>
+                <label className="ipcam-form__label">Port</label>
+                <input title="Port" className="ipcam-form__input" value={editPreset.port}
+                  onChange={e => setEditPreset(p => p ? { ...p, port: e.target.value } : p)} />
+              </div>
+              <div>
+                <label className="ipcam-form__label">Channel</label>
+                <input title="Channel" className="ipcam-form__input" value={editPreset.channel}
+                  onChange={e => setEditPreset(p => p ? { ...p, channel: e.target.value } : p)} />
+              </div>
+              <div>
+                <label className="ipcam-form__label">Username</label>
+                <input title="Username" className="ipcam-form__input" value={editPreset.user}
+                  onChange={e => setEditPreset(p => p ? { ...p, user: e.target.value } : p)} />
+              </div>
+              <div>
+                <label className="ipcam-form__label">Password</label>
+                <input title="Password" className="ipcam-form__input" type="password" value={editPreset.pass}
+                  onChange={e => setEditPreset(p => p ? { ...p, pass: e.target.value } : p)} />
+              </div>
+            </div>
+            <div className="ipcam-edit-modal__actions">
+              <button type="button" className="btn btn--primary btn--sm"
+                onClick={async () => { await onSavePreset(editPreset); setEditPreset(null) }}>
+                💾 Save
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm"
+                onClick={() => setEditPreset(null)}>Cancel</button>
+              <button type="button" className="btn btn--ghost btn--sm ipcam-edit-modal__delete"
+                onClick={() => { onDeletePreset(editPreset.id); setEditPreset(null) }}>🗑 Delete</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Live IP Camera Cards ── */}
         {ipCameras.length > 0 && (
           <div className="camera-list">
             {ipCameras.map(cam => (
-              <IpCameraCard
-                key={cam.id}
-                cam={cam}
-                isActive={activeIpCamera?.id === cam.id}
-                onSelect={() => onSelectIpCamera(cam)}
-                onRemove={e => { e.stopPropagation(); onRemoveIpCamera(cam.id) }}
-                onRestart={e => { e.stopPropagation(); onRestartIpCamera(cam.id) }}
-              />
+              <div key={cam.id}>
+                <IpCameraCard
+                  cam={cam}
+                  isActive={activeIpCamera?.id === cam.id}
+                  onSelect={() => onSelectIpCamera(cam)}
+                  onRemove={e => { e.stopPropagation(); onRemoveIpCamera(cam.id) }}
+                  onRestart={e => { e.stopPropagation(); onRestartIpCamera(cam.id) }}
+                  onSettings={e => { e.stopPropagation(); setIpSettingsCamId(id => id === cam.id ? null : cam.id) }}
+                />
+                {/* IP Camera Settings Panel */}
+                {ipSettingsCamId === cam.id && (
+                  <div className="cam-settings cam-settings--ipcam">
+                    <div className="cam-settings__sliders">
+                      {[
+                        { label: 'Zoom', key: 'scale' as const, min: 10, max: 300, def: 100, unit: '%' },
+                        { label: 'X', key: 'offsetX' as const, min: -100, max: 100, def: 0, unit: '%' },
+                        { label: 'Y', key: 'offsetY' as const, min: -100, max: 100, def: 0, unit: '%' },
+                        { label: 'Bright', key: 'brightness' as const, min: 0, max: 200, def: 100, unit: '%' },
+                        { label: 'Contrast', key: 'contrast' as const, min: 0, max: 200, def: 100, unit: '%' },
+                        { label: 'Saturate', key: 'saturation' as const, min: 0, max: 200, def: 100, unit: '%' },
+                      ].map(({ label, key, min, max, def, unit }) => (
+                        <div key={key} className="cam-settings__slider-row">
+                          <label className="cam-settings__label">{label} {cam.view[key]}{unit}</label>
+                          <input type="range" title={label} min={min} max={max} value={cam.view[key] as number}
+                            onChange={e => onUpdateIpCamView(cam.id, { [key]: Number(e.target.value) })} />
+                          <button type="button" className="cam-settings__rst"
+                            onClick={() => onUpdateIpCamView(cam.id, { [key]: def })}>↺</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="cam-settings__row">
+                      <label className="cam-settings__label">Fit</label>
+                      <select title="Fit mode" className="cam-settings__select" value={cam.view.fit}
+                        onChange={e => onUpdateIpCamView(cam.id, { fit: e.target.value as IpCameraViewSettings['fit'] })}>
+                        <option value="cover">Cover</option>
+                        <option value="contain">Contain</option>
+                        <option value="fill">Stretch</option>
+                        <option value="none">Original</option>
+                      </select>
+                    </div>
+                    <div className="cam-settings__row">
+                      <label className="cam-settings__label">Flip</label>
+                      <div className="cam-settings__flip-btns">
+                        <button type="button"
+                          className={`cam-settings__flip ${cam.view.flipH ? 'cam-settings__flip--on' : ''}`}
+                          onClick={() => onUpdateIpCamView(cam.id, { flipH: !cam.view.flipH })}>↔ Horiz</button>
+                        <button type="button"
+                          className={`cam-settings__flip ${cam.view.flipV ? 'cam-settings__flip--on' : ''}`}
+                          onClick={() => onUpdateIpCamView(cam.id, { flipV: !cam.view.flipV })}>↕ Vert</button>
+                      </div>
+                    </div>
+                    <button type="button" className="cam-settings__reset-all"
+                      onClick={() => onUpdateIpCamView(cam.id, { ...DEFAULT_IPCAM_VIEW })}>↺ Reset All</button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}

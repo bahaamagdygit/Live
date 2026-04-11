@@ -26,6 +26,15 @@ interface PresentationData {
   cameraFlipH?: boolean
   cameraFlipV?: boolean
   ipCameraMjpegUrl?: string
+  ipCamScale?: number
+  ipCamX?: number
+  ipCamY?: number
+  ipCamFit?: 'cover' | 'contain' | 'fill' | 'none'
+  ipCamBrightness?: number
+  ipCamContrast?: number
+  ipCamSaturation?: number
+  ipCamFlipH?: boolean
+  ipCamFlipV?: boolean
   fallbackBase64?: string
   fallbackFit?: 'cover' | 'contain' | 'fill'
   manualFallback?: boolean
@@ -392,8 +401,13 @@ export default function PresentationApp() {
         {data.ipCameraMjpegUrl && !data.manualFallback && (
           <img
             src={data.ipCameraMjpegUrl}
-            className={`presentation-camera presentation-camera--ipcam presentation-camera--fit-${data.cameraFit ?? 'cover'}`}
+            className={`presentation-camera presentation-camera--ipcam presentation-camera--fit-${data.ipCamFit ?? 'cover'}`}
             alt="IP Camera"
+            style={{
+              transform: `scale(${(data.ipCamScale ?? 100) / 100}) translate(${data.ipCamX ?? 0}%, ${data.ipCamY ?? 0}%) scaleX(${data.ipCamFlipH ? -1 : 1}) scaleY(${data.ipCamFlipV ? -1 : 1})`,
+              transformOrigin: 'center center',
+              filter: `brightness(${data.ipCamBrightness ?? 100}%) contrast(${data.ipCamContrast ?? 100}%) saturate(${data.ipCamSaturation ?? 100}%)`,
+            }}
           />
         )}
 
