@@ -72,6 +72,7 @@ interface ElectronAPI {
   ipCameraRemove?: (id: string) => Promise<{ success: boolean }>
   ipCameraList?: () => Promise<{ success: boolean; cameras: Array<{ id: string; label: string; rtspUrl: string; port: number; active: boolean }> }>
   ipCameraRestart?: (id: string) => Promise<{ success: boolean; error?: string }>
+  onIpCamLog?: (callback: (id: string, text: string) => void) => () => void
   // Mobile camera
   mobileCamStart?: () => Promise<{ success: boolean; mjpegUrl?: string; phoneUrl?: string; wsUrl?: string; qrDataUrl?: string; error?: string }>
   mobileCamStop?: () => Promise<{ success: boolean }>

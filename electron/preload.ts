@@ -93,6 +93,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ipCameraRemove: (id: string) => ipcRenderer.invoke('ip-camera-remove', id),
   ipCameraList: () => ipcRenderer.invoke('ip-camera-list'),
   ipCameraRestart: (id: string) => ipcRenderer.invoke('ip-camera-restart', id),
+  onIpCamLog: (callback: (id: string, text: string) => void) => {
+    const listener = (_: any, { id, text }: { id: string; text: string }) => callback(id, text)
+    ipcRenderer.on('ipcam-log', listener)
+    return () => ipcRenderer.removeListener('ipcam-log', listener)
+  },
   // Mobile camera (phone WebSocket → MJPEG)
   mobileCamStart: () => ipcRenderer.invoke('mobile-cam-start'),
   mobileCamStop: () => ipcRenderer.invoke('mobile-cam-stop'),

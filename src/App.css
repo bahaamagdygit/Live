@@ -662,6 +662,35 @@
   justify-content: flex-end;
 }
 
+.ipcam-debug-log {
+  background: #0d0d0d;
+  border: 1px solid #333;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.ipcam-debug-log__title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 8px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+}
+.ipcam-debug-log__body {
+  margin: 0;
+  padding: 8px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #aef;
+  font-family: 'Consolas', 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
 .camera-status {
   display: flex;
   align-items: center;

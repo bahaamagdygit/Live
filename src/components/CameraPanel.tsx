@@ -176,6 +176,7 @@ export function CameraPanel({
   const [ipPasteUrl, setIpPasteUrl] = useState('')
   const [ipAddError, setIpAddError] = useState<string | null>(null)
   const [ipAdding, setIpAdding] = useState(false)
+  const [ipDebugLog, setIpDebugLog] = useState<string[]>([])
   // Mobile camera
   const [mobileCamActive, setMobileCamActive] = useState(false)
   const [mobileCamQr, setMobileCamQr] = useState<string | null>(null)
@@ -236,12 +237,22 @@ export function CameraPanel({
     setShowAddForm(false)
   }
 
+  // Subscribe to live FFmpeg log lines while the form is open
+  useEffect(() => {
+    if (!showIpForm) return
+    const unsub = window.electronAPI?.onIpCamLog?.((_, text) => {
+      setIpDebugLog(prev => [...prev.slice(-80), ...text.split('\n').filter(Boolean)])
+    })
+    return () => unsub?.()
+  }, [showIpForm])
+
   const handleIpAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (ipPasteMode && !ipPasteUrl.trim()) return
     if (!ipPasteMode && !ipHost.trim()) return
     setIpAdding(true)
     setIpAddError(null)
+    setIpDebugLog([])
     const rtspUrl = buildRtspUrl()
     const autoLabel = ipPasteMode ? `Camera (${ipPasteUrl.split('@').pop()?.split('/')[0] ?? 'IP'})` : `Camera ${ipHost}`
     const res = await onAddIpCamera(ipLabel || autoLabel, rtspUrl)
@@ -250,6 +261,7 @@ export function CameraPanel({
       setIpLabel(''); setIpHost(''); setIpPort('554'); setIpUser('admin')
       setIpPass(''); setIpChannel('1'); setIpSubStream(false)
       setIpPasteUrl(''); setIpPasteMode(false); setShowIpForm(false)
+      setIpDebugLog([])
     } else {
       setIpAddError(res.error ?? 'Failed to connect')
     }
@@ -530,6 +542,15 @@ export function CameraPanel({
             )}
 
             {ipAddError && <div className="alert alert--error alert--sm">{ipAddError}</div>}
+
+            {ipDebugLog.length > 0 && (
+              <div className="ipcam-debug-log">
+                <div className="ipcam-debug-log__title">FFmpeg log</div>
+                <pre className="ipcam-debug-log__body">
+                  {ipDebugLog.join('\n')}
+                </pre>
+              </div>
+            )}
 
             <div className="ipcam-form__actions">
               <button type="submit" className="btn btn--primary btn--sm"

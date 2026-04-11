@@ -321,8 +321,14 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
         ? `rtsp://${safeEncode(entry.rtspUser)}:${safeEncode(entry.rtspPass)}@${entry.rtspBaseUrl.replace(/^rtsp:\/\//i, '')}`
         : entry.rtspBaseUrl
 
+      const maskedUrl = inputUrl.replace(/:([^@]{1,}?)@/, ':***@')
+      console.log(`[IP Cam] spawn ffmpeg: ${ffmpegPath}`)
+      console.log(`[IP Cam] URL (masked): ${maskedUrl}`)
+      console.log(`[IP Cam] transport: ${transport}`)
+      mainWindow?.webContents.send('ipcam-log', { id: entry.id, text: `Connecting via ${transport.toUpperCase()}…\nURL: ${maskedUrl}\nFFmpeg: ${ffmpegPath}` })
+
       const args = [
-        '-loglevel', 'error',
+        '-loglevel', 'verbose',
         '-rtsp_transport', transport,
         '-stimeout', '10000000',      // 10s socket timeout (microseconds)
         '-i', inputUrl,
@@ -341,7 +347,11 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
       let stderrLog = ''
 
       proc.stderr?.on('data', (chunk: Buffer) => {
-        stderrLog += chunk.toString()
+        const text = chunk.toString()
+        stderrLog += text
+        console.log('[IP Cam stderr]', text.trim())
+        // Forward to renderer so the UI can show a live debug log
+        mainWindow?.webContents.send('ipcam-log', { id: entry.id, text: text.trim() })
       })
 
       let buffer = Buffer.alloc(0)
