@@ -77,7 +77,8 @@ export function MainPreview({
   // Camera stream management
   useEffect(() => {
     const deviceId = cameraDeviceId
-    if (!deviceId) { setCameraFailed(true); return }
+    // If an IP camera is active, don't try to open a USB stream
+    if (!deviceId) { setCameraFailed(false); return }
 
     // Trigger switch-out animation when camera changes (not on first mount)
     const isSwitch = prevDeviceIdRef.current !== deviceId && prevDeviceIdRef.current !== ''
