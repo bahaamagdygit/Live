@@ -328,7 +328,7 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
       mainWindow?.webContents.send('ipcam-log', { id: entry.id, text: `Connecting via ${transport.toUpperCase()}…\nURL: ${maskedUrl}\nFFmpeg: ${ffmpegPath}` })
 
       const args = [
-        '-loglevel', 'verbose',
+        '-loglevel', 'warning',
         '-rtsp_transport', transport,
         '-stimeout', '10000000',      // 10s socket timeout (microseconds)
         '-i', inputUrl,
@@ -384,8 +384,9 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
       proc.on('exit', (code) => {
         if (!resolved) {
           server.close()
-          // Parse the actual FFmpeg error for a useful message
           const stderr = stderrLog
+          // Get the last meaningful error line from stderr
+          const lastLine = stderr.split('\n').map(l => l.trim()).filter(Boolean).pop() ?? ''
           const msg =
             stderr.includes('401') || stderr.includes('Unauthorized')
               ? 'Wrong username or password (401 Unauthorized)'
@@ -395,11 +396,7 @@ function tryRtspTransport(entry: IpCameraEntry, ffmpegPath: string, transport: s
               ? 'Camera unreachable — check IP address and network'
             : stderr.includes('Invalid data') || stderr.includes('moov atom')
               ? 'Camera connected but stream format not supported'
-            : stderr.includes('splitting') || stderr.includes('Option not found')
-              ? 'FFmpeg could not parse the camera URL. Check the IP, port, and credentials'
-            : stderr.match(/: ([^\n]+)$/m)?.[1]?.trim()        // last colon-delimited message
-              ?? stderr.split('\n').filter(l => l.trim()).pop() // last non-empty line
-              ?? `Exit code ${code}`
+            : lastLine || `FFmpeg exit code ${code}`
           reject(new Error(msg))
         }
       })
