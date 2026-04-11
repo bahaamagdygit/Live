@@ -596,7 +596,7 @@ function App() {
             onSwitchTransitionChange={setSwitchTransition}
             ipCameras={ipCameras.ipCameras}
             activeIpCamera={activeIpCamera}
-            onSelectIpCamera={cam => setActiveIpCameraId(cam.id)}
+            onSelectIpCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(cam.id) }}
             onAddIpCamera={ipCameras.addIpCamera}
             onRemoveIpCamera={id => { ipCameras.removeIpCamera(id); if (activeIpCameraId === id) setActiveIpCameraId(null) }}
             onRestartIpCamera={ipCameras.restartIpCamera}

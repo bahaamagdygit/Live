@@ -43,6 +43,7 @@ interface UseCamerasReturn {
   camView: CameraViewSettings
   setCamView: (patch: Partial<CameraViewSettings>) => void
   disconnectedIds: Set<string>
+  clearActiveCamera: () => void
 }
 
 export function useCameras(): UseCamerasReturn {
@@ -268,6 +269,12 @@ export function useCameras(): UseCamerasReturn {
     }
   }, [])
 
+  const clearActiveCamera = useCallback(() => {
+    stopCurrentStream()
+    setActiveCamera(null)
+    setActiveCameraStream(null)
+  }, [stopCurrentStream])
+
   return {
     cameras,
     activeCamera,
@@ -282,5 +289,6 @@ export function useCameras(): UseCamerasReturn {
     camView,
     setCamView,
     disconnectedIds,
+    clearActiveCamera,
   }
 }
