@@ -25,6 +25,7 @@ interface PresentationData {
   cameraSaturation?: number
   cameraFlipH?: boolean
   cameraFlipV?: boolean
+  ipCameraMjpegUrl?: string
   fallbackBase64?: string
   fallbackFit?: 'cover' | 'contain' | 'fill'
   manualFallback?: boolean
@@ -163,7 +164,7 @@ export default function PresentationApp() {
   useEffect(() => {
     const deviceId = data.cameraDeviceId
     if (!deviceId) {
-      onCameraError('No device found')
+      setCameraFailed(false)  // IP camera or no camera — not a failure
       return
     }
 
@@ -368,7 +369,7 @@ export default function PresentationApp() {
             : <div className="presentation-fallback presentation-fallback--default" />
         )}
 
-        {/* Camera feed — hidden when manual fallback is active or camera failed */}
+        {/* USB camera feed */}
         <video
           ref={videoRef}
           className="presentation-camera"
@@ -380,9 +381,18 @@ export default function PresentationApp() {
             transform: `scale(${(data.cameraScale ?? 100) / 100}) translate(${data.cameraX ?? 0}%, ${data.cameraY ?? 0}%) scaleX(${data.cameraFlipH ? -1 : 1}) scaleY(${data.cameraFlipV ? -1 : 1})`,
             transformOrigin: 'center center',
             filter: `brightness(${data.cameraBrightness ?? 100}%) contrast(${data.cameraContrast ?? 100}%) saturate(${data.cameraSaturation ?? 100}%)`,
-            display: (!cameraFailed && !data.manualFallback) ? 'block' : 'none',
+            display: (!cameraFailed && !data.manualFallback && !data.ipCameraMjpegUrl) ? 'block' : 'none',
           }}
         />
+
+        {/* IP / DVR camera MJPEG feed */}
+        {data.ipCameraMjpegUrl && !data.manualFallback && (
+          <img
+            src={data.ipCameraMjpegUrl}
+            className={`presentation-camera presentation-camera--ipcam presentation-camera--fit-${data.cameraFit ?? 'cover'}`}
+            alt="IP Camera"
+          />
+        )}
 
         {/* Video overlay — IPC-driven, always mounted */}
         <VideoOverlayElement />

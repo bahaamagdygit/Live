@@ -309,7 +309,8 @@ function App() {
       ...overlaySettings,
       slideNumber: slides.currentSlideIndex + 1,
       totalSlides: slides.slides.length,
-      cameraDeviceId: cameras.activeCamera?.deviceId || '',
+      cameraDeviceId: activeIpCamera ? '' : (cameras.activeCamera?.deviceId || ''),
+      ipCameraMjpegUrl: activeIpCamera?.mjpegUrl || '',
       cameraScale: cameras.camView.scale,
       cameraX: cameras.camView.offsetX,
       cameraY: cameras.camView.offsetY,
@@ -328,9 +329,8 @@ function App() {
       fallbackBase64: cameraFallback.base64 || '',
       fallbackFit: cameraFallback.fit,
       manualFallback,
-      // Video overlay sync is handled via dedicated syncVideoOverlay IPC channel
     })
-  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback, manualFallback])
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback, manualFallback, activeIpCamera])
 
   // ── PPTX Controller window ──────────────────────────────────────────────────
 
@@ -419,7 +419,8 @@ function App() {
           ...overlaySettings,
           slideNumber: slides.currentSlideIndex + 1,
           totalSlides: slides.slides.length,
-          cameraDeviceId: cameras.activeCamera?.deviceId || '',
+          cameraDeviceId: activeIpCamera ? '' : (cameras.activeCamera?.deviceId || ''),
+          ipCameraMjpegUrl: activeIpCamera?.mjpegUrl || '',
           cameraScale: cameras.camView.scale,
           cameraX: cameras.camView.offsetX,
           cameraY: cameras.camView.offsetY,
@@ -438,7 +439,6 @@ function App() {
           fallbackBase64: cameraFallback.base64 || '',
           fallbackFit: cameraFallback.fit,
           manualFallback,
-          // Video overlay sync is handled via dedicated syncVideoOverlay IPC channel
         })
       }
     }
