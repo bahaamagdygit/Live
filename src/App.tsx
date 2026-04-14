@@ -7,6 +7,7 @@ import { SettingsModal } from './components/SettingsModal'
 import { VideoOverlayWidget } from './components/VideoOverlayWidget'
 import { useCameras } from './hooks/useCameras'
 import { useIpCameras } from './hooks/useIpCameras'
+import { useWebRTCCameras } from './hooks/useWebRTCCameras'
 import { useStream } from './hooks/useStream'
 import { useSlides } from './hooks/useSlides'
 import { AppSettings, OverlaySettings, LogoSettings, CameraFallbackSettings, VideoOverlaySettings } from './types'
@@ -94,6 +95,8 @@ function App() {
 
   const cameras = useCameras()
   const ipCameras = useIpCameras()
+  const { cameras: webrtcCameraList, qrDataUrl: webrtcQrDataUrl, serverUrl: webrtcServerUrl } = useWebRTCCameras()
+  const [activeWebRTCDeviceId, setActiveWebRTCDeviceId] = useState<string | null>(null)
   const [activeIpCameraId, setActiveIpCameraId] = useState<string | null>(null)
   const [mobileCamMjpegUrl, setMobileCamMjpegUrl] = useState<string | null>(null)
   // Active IP camera — also handles the virtual '__mobile__' entry
@@ -620,25 +623,29 @@ function App() {
             switchTransition={switchTransition}
             onSwitchTransitionChange={setSwitchTransition}
             ipCameras={ipCameras.ipCameras}
-            presets={ipCameras.presets}
             activeIpCamera={activeIpCamera}
             onSelectIpCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(cam.id) }}
-            onAddIpCamera={ipCameras.addIpCamera}
-            onRemoveIpCamera={id => { ipCameras.removeIpCamera(id); if (activeIpCameraId === id) setActiveIpCameraId(null) }}
-            onRestartIpCamera={ipCameras.restartIpCamera}
-            onSavePreset={ipCameras.savePreset}
-            onDeletePreset={ipCameras.deletePreset}
+            onDisconnectIpCamera={id => { ipCameras.disconnectCamera(id); if (activeIpCameraId === id) setActiveIpCameraId(null) }}
+            onReconnectIpCamera={ipCameras.reconnectCamera}
+            onSaveAndReconnect={ipCameras.saveAndReconnect}
             onUpdateIpCamView={ipCameras.updateIpCamView}
             onMobileCamMjpegUrl={setMobileCamMjpegUrl}
+            webrtcCameras={webrtcCameraList}
+            activeWebRTCDeviceId={activeWebRTCDeviceId}
+            onSelectWebRTCCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(null); setActiveWebRTCDeviceId(cam.deviceId) }}
+            onDisconnectWebRTCCamera={id => { if (activeWebRTCDeviceId === id) setActiveWebRTCDeviceId(null) }}
+            webrtcQrDataUrl={webrtcQrDataUrl}
+            webrtcServerUrl={webrtcServerUrl}
           />
         </div>
 
         {/* Center: Main Preview */}
         <div className="app-main__center">
           <MainPreview
-            cameraDeviceId={activeIpCamera ? '' : (cameras.activeCamera?.deviceId || '')}
-            ipCameraMjpegUrl={activeIpCamera?.mjpegUrl}
+            cameraDeviceId={activeWebRTCDeviceId || activeIpCamera ? '' : (cameras.activeCamera?.deviceId || '')}
+            ipCameraMjpegUrl={activeWebRTCDeviceId ? undefined : activeIpCamera?.mjpegUrl}
             ipCamView={activeIpCamera?.view}
+            webrtcStream={activeWebRTCDeviceId ? (webrtcCameraList.find(c => c.deviceId === activeWebRTCDeviceId)?.stream ?? null) : null}
             overlaySettings={overlaySettings}
             logoSettings={logoSettings}
             cameraFallback={cameraFallback}

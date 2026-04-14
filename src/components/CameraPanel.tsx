@@ -3,6 +3,7 @@ import { Camera, IpCameraPreset, IpCameraViewSettings, DEFAULT_IPCAM_VIEW } from
 import { CameraViewSettings, DEFAULT_CAM_VIEW } from '../hooks/useCameras'
 import { IpCamera, buildRtspFromPreset } from '../hooks/useIpCameras'
 import { CameraSwitchTransition } from './MainPreview'
+import { WebRTCCamera } from '../hooks/useWebRTCCameras'
 
 interface CameraPanelProps {
   cameras: Camera[]
@@ -32,6 +33,13 @@ interface CameraPanelProps {
   onUpdateIpCamView: (id: string, patch: Partial<IpCameraViewSettings>) => void
   // Mobile camera
   onMobileCamMjpegUrl: (url: string | null) => void
+  // WebRTC phone cameras
+  webrtcCameras?: WebRTCCamera[]
+  activeWebRTCDeviceId?: string | null
+  onSelectWebRTCCamera?: (cam: WebRTCCamera) => void
+  onDisconnectWebRTCCamera?: (deviceId: string) => void
+  webrtcQrDataUrl?: string
+  webrtcServerUrl?: string
 }
 
 function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragOver, onClick, onRemove, onDragStart, onDragOver, onDrop }: {
@@ -104,6 +112,43 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragO
   )
 }
 
+function WebRTCCameraCard({ cam, isActive, onSelect, onDisconnect }: {
+  cam: WebRTCCamera
+  isActive: boolean
+  onSelect: () => void
+  onDisconnect: (e: React.MouseEvent) => void
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = cam.stream
+  }, [cam.stream])
+
+  return (
+    <div
+      className={`camera-card ${isActive ? 'camera-card--active' : ''} ${!cam.connected ? 'camera-card--disconnected' : ''}`}
+      onClick={cam.connected ? onSelect : undefined}
+    >
+      <div className="camera-preview">
+        {cam.stream ? (
+          <video ref={videoRef} autoPlay playsInline muted className="camera-preview__video" />
+        ) : (
+          <div className="camera-preview__error">
+            <span className="icon">📱</span>
+            <span className="camera-preview__error-label">{cam.connected ? 'Connecting...' : 'Offline'}</span>
+          </div>
+        )}
+        {isActive && cam.connected && <div className="camera-preview__active-badge">LIVE</div>}
+        {!cam.connected && <div className="camera-preview__disconnected-badge">OFFLINE</div>}
+      </div>
+      <div className="camera-card__info">
+        {isActive && cam.connected && <span className="camera-card__dot" />}
+        <span className="camera-card__label" title={cam.deviceName}>📱 {cam.deviceName}</span>
+        <button type="button" className="camera-card__remove" onClick={onDisconnect} title="Disconnect">×</button>
+      </div>
+    </div>
+  )
+}
+
 function IpCameraCard({ cam, isActive, onSelect, onRemove, onRestart, onSettings, onEdit }: {
   cam: IpCamera
   isActive: boolean
@@ -161,6 +206,8 @@ export function CameraPanel({
   ipCameras, activeIpCamera, onSelectIpCamera, onDisconnectIpCamera, onReconnectIpCamera,
   onSaveAndReconnect, onUpdateIpCamView,
   onMobileCamMjpegUrl,
+  webrtcCameras = [], activeWebRTCDeviceId, onSelectWebRTCCamera, onDisconnectWebRTCCamera,
+  webrtcQrDataUrl, webrtcServerUrl,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -375,6 +422,32 @@ export function CameraPanel({
                 }}
               >Use as Active Camera</button>
             </div>
+          </div>
+        )}
+
+        {/* ── WebRTC Phone Cameras (Church Cam app) ── */}
+        {webrtcQrDataUrl && webrtcCameras.length === 0 && (
+          <div className="mobile-qr-card">
+            <div className="mobile-qr-card__header">
+              <span>📱 Church Cam App</span>
+              <span style={{fontSize:'11px',color:'#888'}}>ws connection</span>
+            </div>
+            <img src={webrtcQrDataUrl} className="mobile-qr-card__qr" alt="WebRTC QR" />
+            <div className="mobile-qr-card__url" title={webrtcServerUrl ?? ''}>{webrtcServerUrl}</div>
+            <p style={{fontSize:'11px',color:'#888',margin:'4px 0 0',textAlign:'center'}}>Scan with Church Cam app on your phone</p>
+          </div>
+        )}
+        {webrtcCameras.length > 0 && (
+          <div className="camera-list">
+            {webrtcCameras.map(cam => (
+              <WebRTCCameraCard
+                key={cam.deviceId}
+                cam={cam}
+                isActive={activeWebRTCDeviceId === cam.deviceId}
+                onSelect={() => onSelectWebRTCCamera?.(cam)}
+                onDisconnect={e => { e.stopPropagation(); onDisconnectWebRTCCamera?.(cam.deviceId) }}
+              />
+            ))}
           </div>
         )}
 

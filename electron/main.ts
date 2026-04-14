@@ -71,15 +71,146 @@ let mobileCamWsServer: WebSocketServer | null = null
 let mobileCamPageServer: http.Server | null = null
 let mobileCamClients = new Set<http.ServerResponse>()
 
+// ── WebRTC Signaling Server ───────────────────────────────────────────────────
+const WEBRTC_SIGNAL_PORT = 8765
+
+interface WebRTCSession {
+  ws: import('ws').WebSocket
+  deviceName: string
+  lastPong: number
+  heartbeatTimer: NodeJS.Timeout | null
+}
+
+let webrtcSignalServer: WebSocketServer | null = null
+const webrtcSessions = new Map<string, WebRTCSession>()
+let lastBroadcastText = ''
+
+function startWebRTCSignalServer() {
+  if (webrtcSignalServer) return
+  try {
+    webrtcSignalServer = new WebSocketServer({ port: WEBRTC_SIGNAL_PORT })
+  } catch (e: any) {
+    console.error('WebRTC signal server failed to start:', e.message)
+    mainWindow?.webContents.send('webrtc-server-error', e.message)
+    return
+  }
+
+  webrtcSignalServer.on('connection', (ws) => {
+    let deviceId: string | null = null
+
+    ws.on('message', (raw) => {
+      let msg: any
+      try { msg = JSON.parse(raw.toString()) } catch { return }
+
+      switch (msg.type) {
+        case 'join': {
+          deviceId = `webrtc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+          const session: WebRTCSession = {
+            ws, deviceName: msg.name || 'Mobile Camera',
+            lastPong: Date.now(), heartbeatTimer: null,
+          }
+          webrtcSessions.set(deviceId, session)
+
+          ws.send(JSON.stringify({ type: 'welcome', deviceId }))
+          mainWindow?.webContents.send('webrtc-device-joined', { deviceId, deviceName: session.deviceName })
+
+          // Heartbeat: ping every 2s, disconnect if no pong in 5s
+          session.heartbeatTimer = setInterval(() => {
+            if (Date.now() - session.lastPong > 5000) {
+              clearInterval(session.heartbeatTimer!)
+              webrtcSessions.delete(deviceId!)
+              mainWindow?.webContents.send('webrtc-device-disconnected', { deviceId })
+              ws.terminate()
+            } else {
+              try { ws.send(JSON.stringify({ type: 'ping' })) } catch {}
+            }
+          }, 2000)
+          break
+        }
+        case 'pong': {
+          if (deviceId) {
+            const s = webrtcSessions.get(deviceId)
+            if (s) s.lastPong = Date.now()
+          }
+          break
+        }
+        case 'offer': {
+          mainWindow?.webContents.send('webrtc-signal', { type: 'offer', deviceId, sdp: msg.sdp })
+          break
+        }
+        case 'answer': {
+          mainWindow?.webContents.send('webrtc-signal', { type: 'answer', deviceId, sdp: msg.sdp })
+          break
+        }
+        case 'ice-candidate': {
+          mainWindow?.webContents.send('webrtc-signal', { type: 'ice-candidate', deviceId, candidate: msg.candidate })
+          break
+        }
+      }
+    })
+
+    ws.on('close', () => {
+      if (deviceId) {
+        const s = webrtcSessions.get(deviceId)
+        if (s?.heartbeatTimer) clearInterval(s.heartbeatTimer)
+        webrtcSessions.delete(deviceId)
+        mainWindow?.webContents.send('webrtc-device-disconnected', { deviceId })
+      }
+    })
+    ws.on('error', () => { try { ws.terminate() } catch {} })
+  })
+}
+
+function stopWebRTCSignalServer() {
+  for (const [, s] of webrtcSessions) {
+    if (s.heartbeatTimer) clearInterval(s.heartbeatTimer)
+    try { s.ws.close() } catch {}
+  }
+  webrtcSessions.clear()
+  webrtcSignalServer?.close()
+  webrtcSignalServer = null
+}
+
+function broadcastReadingToWebRTC(text: string, langs?: string[]) {
+  if (webrtcSessions.size === 0) return
+  const key = text + (langs || []).join(',')
+  if (key === lastBroadcastText) return
+  lastBroadcastText = key
+  const msg = JSON.stringify({ type: 'reading_update', text, langs: langs || [] })
+  for (const [, s] of webrtcSessions) {
+    try { s.ws.send(msg) } catch {}
+  }
+}
+
 function getLocalIp(): string {
   const { networkInterfaces } = require('os')
   const nets = networkInterfaces()
-  for (const ifaces of Object.values(nets) as any[]) {
+  const candidates: string[] = []
+
+  for (const [name, ifaces] of Object.entries(nets) as any[]) {
     for (const iface of ifaces) {
-      if (iface.family === 'IPv4' && !iface.internal) return iface.address
+      if (iface.family !== 'IPv4' || iface.internal) continue
+      const ip: string = iface.address
+      const ifName: string = (name || '').toLowerCase()
+
+      // Skip VPN / virtual adapters
+      const isVpn = ifName.includes('vpn') || ifName.includes('virtual') ||
+                    ifName.includes('vmware') || ifName.includes('vethernet') ||
+                    ifName.includes('hamachi') || ifName.includes('tap') ||
+                    ifName.includes('tun') || ifName.includes('radmin') ||
+                    ip.startsWith('172.') // VPN / Docker bridge ranges
+      if (isVpn) continue
+
+      // Prefer real LAN ranges
+      if (ip.startsWith('192.168.') || ip.startsWith('10.')) {
+        candidates.unshift(ip) // highest priority
+      } else {
+        candidates.push(ip)
+      }
     }
   }
-  return '127.0.0.1'
+
+  return candidates[0] || '127.0.0.1'
 }
 
 function getMobileCamUrls() {
@@ -121,8 +252,62 @@ function startMobileCamServers() {
     ws.on('error', () => {})
   })
 
-  // 3) Page server — serves the mobile HTML page to the phone
-  mobileCamPageServer = http.createServer((_req, res) => {
+  // 3) Page server — serves the mobile HTML page + PWA assets to the phone
+  mobileCamPageServer = http.createServer((req, res) => {
+    const url = req.url || '/'
+
+    if (url === '/manifest.json') {
+      const manifest = JSON.stringify({
+        name: 'Church Cam',
+        short_name: 'Church Cam',
+        description: 'Mobile camera for Church Live Stream Studio',
+        start_url: '/',
+        display: 'standalone',
+        orientation: 'portrait',
+        background_color: '#0a0a12',
+        theme_color: '#0a0a12',
+        icons: [
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+        ],
+      })
+      res.writeHead(200, { 'Content-Type': 'application/manifest+json' })
+      return res.end(manifest)
+    }
+
+    if (url === '/icon-192.png' || url === '/icon-512.png') {
+      const size = url.includes('512') ? 512 : 192
+      // Generate a simple PNG icon via inline SVG → Canvas is not available in Node,
+      // so we serve an SVG as PNG-mimetype (browsers accept this for PWA icons)
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}">
+        <rect width="${size}" height="${size}" rx="${size*0.16}" fill="#0a0a12"/>
+        <rect x="${size*0.44}" y="${size*0.16}" width="${size*0.12}" height="${size*0.68}" rx="${size*0.02}" fill="#818cf8"/>
+        <rect x="${size*0.22}" y="${size*0.38}" width="${size*0.56}" height="${size*0.12}" rx="${size*0.02}" fill="#818cf8"/>
+      </svg>`
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml' })
+      return res.end(svg)
+    }
+
+    if (url === '/sw.js') {
+      // Minimal service worker — cache-first for offline support
+      const sw = `
+const CACHE = 'church-cam-v1'
+self.addEventListener('install', e => { self.skipWaiting() })
+self.addEventListener('activate', e => { clients.claim() })
+self.addEventListener('fetch', e => {
+  if (e.request.url.startsWith('ws')) return
+  e.respondWith(
+    caches.open(CACHE).then(cache =>
+      cache.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+        cache.put(e.request, res.clone()); return res
+      }))
+    )
+  )
+})`
+      res.writeHead(200, { 'Content-Type': 'application/javascript' })
+      return res.end(sw)
+    }
+
     const wsUrl = getMobileCamUrls().wsUrl
     const html = buildMobilePage(wsUrl)
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
@@ -148,64 +333,113 @@ function buildMobilePage(wsUrl: string): string {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0a0a12">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Church Live — Mobile Camera</title>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Church Cam">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Church Cam</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#0a0a12;color:#fff;font-family:system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px}
-  h2{font-size:18px;font-weight:700;color:#818cf8}
-  video{width:100%;max-width:400px;border-radius:12px;background:#000;aspect-ratio:16/9;object-fit:cover}
-  .status{font-size:13px;padding:6px 14px;border-radius:20px;background:#1e1e2e;border:1px solid #2a2a40}
-  .status.connected{border-color:#22c55e;color:#22c55e}
-  .status.error{border-color:#ef4444;color:#ef4444}
+  :root{--purple:#818cf8;--green:#22c55e;--red:#ef4444;--bg:#0a0a12;--panel:#1e1e2e;--border:#2a2a40}
+  body{background:var(--bg);color:#fff;font-family:system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;padding-top:env(safe-area-inset-top,20px)}
+  h2{font-size:20px;font-weight:800;color:var(--purple);letter-spacing:.5px}
+  .subtitle{font-size:12px;color:#666;margin-top:-8px}
+  video{width:100%;max-width:420px;border-radius:14px;background:#000;aspect-ratio:16/9;object-fit:cover;box-shadow:0 0 0 2px var(--border)}
+  .status{font-size:13px;padding:7px 16px;border-radius:20px;background:var(--panel);border:1px solid var(--border);transition:all .3s}
+  .status.connected{border-color:var(--green);color:var(--green)}
+  .status.error{border-color:var(--red);color:var(--red)}
   .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-  button{padding:10px 20px;border-radius:8px;border:none;font-size:14px;font-weight:600;cursor:pointer;background:#4f46e5;color:#fff}
-  button.secondary{background:#1e1e2e;border:1px solid #2a2a40;color:#a0a0c0}
-  select{padding:8px 12px;border-radius:8px;background:#1e1e2e;border:1px solid #2a2a40;color:#fff;font-size:14px}
+  button{padding:11px 22px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer;background:var(--purple);color:#fff;transition:opacity .15s;-webkit-tap-highlight-color:transparent}
+  button:active{opacity:.7}
+  button.secondary{background:var(--panel);border:1px solid var(--border);color:#a0a0c0}
+  button.active{background:var(--green);color:#fff}
+  select{padding:10px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--border);color:#fff;font-size:14px}
+  .install-banner{display:none;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--purple);border-radius:12px;padding:12px 16px;font-size:13px;width:100%;max-width:420px}
+  .install-banner button{padding:8px 16px;font-size:13px;background:var(--purple)}
+  .quality-row{display:flex;gap:8px}
+  .quality-row button{padding:8px 16px;font-size:13px}
 </style>
 </head>
 <body>
-<h2>📱 Mobile Camera</h2>
+<h2>&#9654; Church Cam</h2>
+<p class="subtitle">Live Camera for Church Live Stream Studio</p>
 <video id="v" autoplay playsinline muted></video>
-<div class="status" id="st">Connecting...</div>
+<div class="status" id="st">Starting camera...</div>
 <div class="btns">
   <select id="faceSel">
     <option value="environment">Back Camera</option>
     <option value="user">Front Camera</option>
   </select>
-  <button onclick="flipCam()">🔄 Flip</button>
-  <button class="secondary" onclick="setQuality('high')">HD</button>
-  <button class="secondary" onclick="setQuality('low')">SD</button>
+  <button onclick="flipCam()">&#8635; Flip</button>
 </div>
+<div class="quality-row">
+  <button class="secondary active" id="btnHD" onclick="setQuality('high')">HD 720p</button>
+  <button class="secondary" id="btnSD" onclick="setQuality('low')">SD 360p</button>
+  <button class="secondary" id="btnFHD" onclick="setQuality('fhd')">FHD 1080p</button>
+</div>
+<div class="install-banner" id="installBanner">
+  <span>&#11088; Install as App</span>
+  <button id="installBtn">Add to Home</button>
+</div>
+
 <script>
 const WS_URL = '${wsUrl}'
-const video  = document.getElementById('v')
-const st     = document.getElementById('st')
+const video   = document.getElementById('v')
+const st      = document.getElementById('st')
 const faceSel = document.getElementById('faceSel')
 let ws, canvas, ctx, timer, currentFacing = 'environment', quality = 'high'
+let deferredPrompt = null
 
-const QUALITY = { high:{w:1280,h:720,fps:20,jpegQ:0.75}, low:{w:640,h:360,fps:10,jpegQ:0.6} }
-
-async function startCam(facing) {
-  currentFacing = facing
-  if (video.srcObject) video.srcObject.getTracks().forEach(t=>t.stop())
-  const q = QUALITY[quality]
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:facing,width:{ideal:q.w},height:{ideal:q.h},frameRate:{ideal:q.fps}},
-    audio:false
-  })
-  video.srcObject = stream
-  canvas = document.createElement('canvas')
-  canvas.width = q.w; canvas.height = q.h
-  ctx = canvas.getContext('2d')
+const QUALITY = {
+  high: {w:1280, h:720,  fps:20, jpegQ:0.75},
+  low:  {w:640,  h:360,  fps:12, jpegQ:0.60},
+  fhd:  {w:1920, h:1080, fps:15, jpegQ:0.80},
 }
 
+// ── PWA install prompt ──────────────────────────────────────────────────────
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault()
+  deferredPrompt = e
+  document.getElementById('installBanner').style.display = 'flex'
+})
+document.getElementById('installBtn').onclick = async () => {
+  if (!deferredPrompt) return
+  deferredPrompt.prompt()
+  const { outcome } = await deferredPrompt.userChoice
+  if (outcome === 'accepted') document.getElementById('installBanner').style.display = 'none'
+  deferredPrompt = null
+}
+
+// ── Camera ──────────────────────────────────────────────────────────────────
+async function startCam(facing) {
+  currentFacing = facing
+  if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop())
+  const q = QUALITY[quality]
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {facingMode: facing, width:{ideal:q.w}, height:{ideal:q.h}, frameRate:{ideal:q.fps}},
+      audio: false
+    })
+    video.srcObject = stream
+    canvas = document.createElement('canvas')
+    canvas.width = q.w; canvas.height = q.h
+    ctx = canvas.getContext('2d')
+    st.textContent = 'Camera ready — connecting...'; st.className = 'status'
+  } catch(e) {
+    st.textContent = 'Camera error: ' + e.message; st.className = 'status error'
+  }
+}
+
+// ── WebSocket ───────────────────────────────────────────────────────────────
 function connect() {
   ws = new WebSocket(WS_URL)
   ws.binaryType = 'arraybuffer'
   ws.onopen = () => {
-    st.textContent = '🟢 Connected'; st.className = 'status connected'
+    st.textContent = 'Connected'; st.className = 'status connected'
     const q = QUALITY[quality]
     clearInterval(timer)
     timer = setInterval(() => {
@@ -217,8 +451,9 @@ function connect() {
     }, 1000 / q.fps)
   }
   ws.onclose = () => {
-    st.textContent = '🔴 Disconnected — retrying...'; st.className = 'status error'
-    clearInterval(timer); setTimeout(connect, 2000)
+    st.textContent = 'Disconnected — retrying...'; st.className = 'status error'
+    clearInterval(timer)
+    setTimeout(connect, 2000)
   }
   ws.onerror = () => ws.close()
 }
@@ -227,12 +462,35 @@ function flipCam() {
   const f = currentFacing === 'environment' ? 'user' : 'environment'
   faceSel.value = f; startCam(f)
 }
-function setQuality(q) { quality = q; startCam(currentFacing) }
+function setQuality(q) {
+  quality = q
+  document.querySelectorAll('.quality-row button').forEach(b => b.classList.remove('active'))
+  const map = {high:'btnHD', low:'btnSD', fhd:'btnFHD'}
+  document.getElementById(map[q])?.classList.add('active')
+  startCam(currentFacing)
+}
 faceSel.onchange = () => startCam(faceSel.value)
 
-startCam(currentFacing).then(connect).catch(e => {
-  st.textContent = 'Camera error: ' + e.message; st.className = 'status error'
+// Keep screen awake (Wake Lock API)
+async function keepAwake() {
+  try {
+    if ('wakeLock' in navigator) await navigator.wakeLock.request('screen')
+  } catch {}
+}
+
+startCam(currentFacing).then(() => { connect(); keepAwake() }).catch(e => {
+  st.textContent = 'Error: ' + e.message; st.className = 'status error'
 })
+
+// Re-acquire wake lock when page becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') keepAwake()
+})
+
+// Register service worker for PWA offline support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {})
+}
 </script>
 </body>
 </html>`
@@ -666,6 +924,7 @@ function stopAllProcesses() {
   for (const id of ipCameraMap.keys()) stopRtspProxy(id)
   ipCameraMap.clear()
   stopMobileCamServers()
+  stopWebRTCSignalServer()
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.close()
     presentationWindow = null
@@ -1360,11 +1619,47 @@ ipcMain.handle('get-presentation-data', async () => {
 
 ipcMain.handle('update-presentation', async (_event, data: any) => {
   lastPresentationData = data
+  // Broadcast reading text to all connected WebRTC mobile clients
+  if (data.text !== undefined) broadcastReadingToWebRTC(data.text, data.langs)
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.webContents.send('presentation-update', data)
     return { success: true }
   }
   return { success: false, error: 'Presentation window not open' }
+})
+
+// ── WebRTC Signaling IPC ──────────────────────────────────────────────────────
+ipcMain.handle('webrtc-signal-start', async () => {
+  startWebRTCSignalServer()
+  const ip = getLocalIp()
+  const url = `ws://${ip}:${WEBRTC_SIGNAL_PORT}`
+  const qrDataUrl = await QRCode.toDataURL(url, { width: 200, margin: 1 })
+  return { success: true, url, qrDataUrl }
+})
+
+ipcMain.handle('webrtc-signal-stop', async () => {
+  stopWebRTCSignalServer()
+  return { success: true }
+})
+
+ipcMain.handle('webrtc-get-qr', async () => {
+  const ip = getLocalIp()
+  const url = `ws://${ip}:${WEBRTC_SIGNAL_PORT}`
+  const qrDataUrl = await QRCode.toDataURL(url, { width: 200, margin: 1 })
+  return { url, qrDataUrl }
+})
+
+// Renderer → relay answer/ICE back to phone
+ipcMain.on('webrtc-relay-to-mobile', (_event, { deviceId, message }: { deviceId: string; message: any }) => {
+  const session = webrtcSessions.get(deviceId)
+  if (session && session.ws.readyState === 1 /* OPEN */) {
+    try { session.ws.send(JSON.stringify(message)) } catch {}
+  }
+})
+
+// Renderer → broadcast reading text manually (in addition to update-presentation path)
+ipcMain.on('webrtc-broadcast-reading', (_event, { text, langs }: { text: string; langs?: string[] }) => {
+  broadcastReadingToWebRTC(text, langs)
 })
 
 // Video overlay — fire-and-forget (no reply needed, avoids round-trip latency)

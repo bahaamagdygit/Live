@@ -77,6 +77,15 @@ interface ElectronAPI {
   mobileCamStart?: () => Promise<{ success: boolean; mjpegUrl?: string; phoneUrl?: string; wsUrl?: string; qrDataUrl?: string; error?: string }>
   mobileCamStop?: () => Promise<{ success: boolean }>
   mobileCamStatus?: () => Promise<{ running: boolean; mjpegUrl?: string; phoneUrl?: string; qrDataUrl?: string }>
+  // WebRTC signaling server
+  webrtcSignalStart?: () => Promise<{ success: boolean; url: string; qrDataUrl: string }>
+  webrtcSignalStop?: () => Promise<{ success: boolean }>
+  webrtcGetQr?: () => Promise<{ url: string; qrDataUrl: string }>
+  webrtcRelayToMobile?: (deviceId: string, message: any) => void
+  webrtcBroadcastReading?: (text: string, langs?: string[]) => void
+  onWebRTCDeviceJoined?: (cb: (data: { deviceId: string; deviceName: string }) => void) => () => void
+  onWebRTCDeviceDisconnected?: (cb: (data: { deviceId: string }) => void) => () => void
+  onWebRTCSignal?: (cb: (data: any) => void) => () => void
 }
 
 declare global {

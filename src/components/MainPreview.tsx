@@ -15,6 +15,7 @@ interface MainPreviewProps {
   cameraDeviceId: string
   ipCameraMjpegUrl?: string
   ipCamView?: CamView
+  webrtcStream?: MediaStream | null
   overlaySettings: OverlaySettings
   logoSettings: LogoSettings
   cameraFallback: CameraFallbackSettings
@@ -43,6 +44,7 @@ VideoOverlayVideo.displayName = 'VideoOverlayVideo'
 export function MainPreview({
   cameraDeviceId,
   ipCameraMjpegUrl,
+  webrtcStream,
   overlaySettings,
   logoSettings,
   cameraFallback,
@@ -53,6 +55,7 @@ export function MainPreview({
   videoElMountRef,
 }: MainPreviewProps) {
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
+  const webrtcVideoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -71,6 +74,18 @@ export function MainPreview({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+  // WebRTC stream — attach to video element when stream arrives
+  useEffect(() => {
+    const el = webrtcVideoRef.current
+    if (!el) return
+    if (webrtcStream) {
+      el.srcObject = webrtcStream
+      el.play().catch(() => {})
+    } else {
+      el.srcObject = null
+    }
+  }, [webrtcStream])
 
   // Camera stream management
   useEffect(() => {
@@ -210,8 +225,18 @@ export function MainPreview({
             : <div className="presentation-fallback presentation-fallback--default" />
         )}
 
+        {/* WebRTC phone camera feed */}
+        {webrtcStream && (
+          <video
+            ref={webrtcVideoRef}
+            className="presentation-camera presentation-camera--ipcam"
+            autoPlay playsInline muted
+            style={{ objectFit: 'cover', display: !showFallback ? 'block' : 'none' }}
+          />
+        )}
+
         {/* USB camera feed */}
-        {!ipCameraMjpegUrl && (
+        {!ipCameraMjpegUrl && !webrtcStream && (
           <video
             ref={cameraVideoRef}
             className={[
@@ -233,7 +258,7 @@ export function MainPreview({
         )}
 
         {/* IP camera MJPEG feed */}
-        {ipCameraMjpegUrl && !showFallback && (
+        {ipCameraMjpegUrl && !webrtcStream && !showFallback && (
           <img
             src={ipCameraMjpegUrl}
             className={`presentation-camera presentation-camera--ipcam presentation-camera--fit-${ipCamView?.fit ?? 'cover'}`}

@@ -102,4 +102,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   mobileCamStart: () => ipcRenderer.invoke('mobile-cam-start'),
   mobileCamStop: () => ipcRenderer.invoke('mobile-cam-stop'),
   mobileCamStatus: () => ipcRenderer.invoke('mobile-cam-status'),
+  // WebRTC signaling server
+  webrtcSignalStart: () => ipcRenderer.invoke('webrtc-signal-start'),
+  webrtcSignalStop: () => ipcRenderer.invoke('webrtc-signal-stop'),
+  webrtcGetQr: () => ipcRenderer.invoke('webrtc-get-qr'),
+  webrtcRelayToMobile: (deviceId: string, message: any) =>
+    ipcRenderer.send('webrtc-relay-to-mobile', { deviceId, message }),
+  webrtcBroadcastReading: (text: string, langs?: string[]) =>
+    ipcRenderer.send('webrtc-broadcast-reading', { text, langs }),
+  onWebRTCDeviceJoined: (cb: (data: { deviceId: string; deviceName: string }) => void) => {
+    const fn = (_: any, d: any) => cb(d)
+    ipcRenderer.on('webrtc-device-joined', fn)
+    return () => ipcRenderer.removeListener('webrtc-device-joined', fn)
+  },
+  onWebRTCDeviceDisconnected: (cb: (data: { deviceId: string }) => void) => {
+    const fn = (_: any, d: any) => cb(d)
+    ipcRenderer.on('webrtc-device-disconnected', fn)
+    return () => ipcRenderer.removeListener('webrtc-device-disconnected', fn)
+  },
+  onWebRTCSignal: (cb: (data: any) => void) => {
+    const fn = (_: any, d: any) => cb(d)
+    ipcRenderer.on('webrtc-signal', fn)
+    return () => ipcRenderer.removeListener('webrtc-signal', fn)
+  },
 })
