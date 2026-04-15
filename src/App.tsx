@@ -634,6 +634,7 @@ function App() {
             activeWebRTCDeviceId={activeWebRTCDeviceId}
             onSelectWebRTCCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(null); setActiveWebRTCDeviceId(cam.deviceId) }}
             onDisconnectWebRTCCamera={id => { if (activeWebRTCDeviceId === id) setActiveWebRTCDeviceId(null) }}
+            onWebRTCSendCommand={(deviceId, action, value) => window.electronAPI?.webrtcSendCommand?.(deviceId, action, value)}
             webrtcQrDataUrl={webrtcQrDataUrl}
             webrtcServerUrl={webrtcServerUrl}
           />

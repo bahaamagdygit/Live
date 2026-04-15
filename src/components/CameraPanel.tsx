@@ -38,6 +38,7 @@ interface CameraPanelProps {
   activeWebRTCDeviceId?: string | null
   onSelectWebRTCCamera?: (cam: WebRTCCamera) => void
   onDisconnectWebRTCCamera?: (deviceId: string) => void
+  onWebRTCSendCommand?: (deviceId: string, action: string, value?: any) => void
   webrtcQrDataUrl?: string
   webrtcServerUrl?: string
 }
@@ -112,39 +113,57 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragO
   )
 }
 
-function WebRTCCameraCard({ cam, isActive, onSelect, onDisconnect }: {
+function WebRTCCameraCard({ cam, isActive, onSelect, onDisconnect, onSendCommand }: {
   cam: WebRTCCamera
   isActive: boolean
   onSelect: () => void
   onDisconnect: (e: React.MouseEvent) => void
+  onSendCommand?: (action: string, value?: any) => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [zoom, setZoom] = useState(1)
+
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = cam.stream
   }, [cam.stream])
 
+  const sendZoom = (z: number) => {
+    const clamped = Math.max(1, Math.min(8, z))
+    setZoom(clamped)
+    onSendCommand?.('zoom', clamped)
+  }
+
   return (
-    <div
-      className={`camera-card ${isActive ? 'camera-card--active' : ''} ${!cam.connected ? 'camera-card--disconnected' : ''}`}
-      onClick={cam.connected ? onSelect : undefined}
-    >
-      <div className="camera-preview">
-        {cam.stream ? (
-          <video ref={videoRef} autoPlay playsInline muted className="camera-preview__video" />
-        ) : (
-          <div className="camera-preview__error">
-            <span className="icon">📱</span>
-            <span className="camera-preview__error-label">{cam.connected ? 'Connecting...' : 'Offline'}</span>
-          </div>
-        )}
-        {isActive && cam.connected && <div className="camera-preview__active-badge">LIVE</div>}
-        {!cam.connected && <div className="camera-preview__disconnected-badge">OFFLINE</div>}
+    <div className={`camera-card ${isActive ? 'camera-card--active' : ''} ${!cam.connected ? 'camera-card--disconnected' : ''}`}>
+      {/* Clicking the preview or info row selects the camera */}
+      <div onClick={cam.connected ? onSelect : undefined}>
+        <div className="camera-preview">
+          {cam.stream ? (
+            <video ref={videoRef} autoPlay playsInline muted className="camera-preview__video" />
+          ) : (
+            <div className="camera-preview__error">
+              <span className="icon">📱</span>
+              <span className="camera-preview__error-label">{cam.connected ? 'Connecting...' : 'Offline'}</span>
+            </div>
+          )}
+          {isActive && cam.connected && <div className="camera-preview__active-badge">LIVE</div>}
+          {!cam.connected && <div className="camera-preview__disconnected-badge">OFFLINE</div>}
+        </div>
+        <div className="camera-card__info">
+          {isActive && cam.connected && <span className="camera-card__dot" />}
+          <span className="camera-card__label" title={cam.deviceName}>📱 {cam.deviceName}</span>
+          <button type="button" className="camera-card__remove" onClick={e => { e.stopPropagation(); onDisconnect(e) }} title="Disconnect">×</button>
+        </div>
       </div>
-      <div className="camera-card__info">
-        {isActive && cam.connected && <span className="camera-card__dot" />}
-        <span className="camera-card__label" title={cam.deviceName}>📱 {cam.deviceName}</span>
-        <button type="button" className="camera-card__remove" onClick={onDisconnect} title="Disconnect">×</button>
-      </div>
+      {/* Controls row — independent from select click */}
+      {cam.connected && (
+        <div className="camera-card__controls">
+          <button type="button" title="Zoom out" onClick={() => sendZoom(zoom - 0.5)}>−</button>
+          <span className="camera-card__zoom-label">{zoom.toFixed(1)}×</span>
+          <button type="button" title="Zoom in" onClick={() => sendZoom(zoom + 0.5)}>+</button>
+          <button type="button" title="Flip camera" onClick={() => onSendCommand?.('flip')}>🔄</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -206,6 +225,7 @@ export function CameraPanel({
   ipCameras, activeIpCamera, onSelectIpCamera, onDisconnectIpCamera, onReconnectIpCamera,
   onSaveAndReconnect, onUpdateIpCamView,
   webrtcCameras = [], activeWebRTCDeviceId, onSelectWebRTCCamera, onDisconnectWebRTCCamera,
+  onWebRTCSendCommand,
   webrtcQrDataUrl, webrtcServerUrl,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
@@ -395,6 +415,7 @@ export function CameraPanel({
                 isActive={activeWebRTCDeviceId === cam.deviceId}
                 onSelect={() => onSelectWebRTCCamera?.(cam)}
                 onDisconnect={e => { e.stopPropagation(); onDisconnectWebRTCCamera?.(cam.deviceId) }}
+                onSendCommand={(action, value) => onWebRTCSendCommand?.(cam.deviceId, action, value)}
               />
             ))}
           </div>

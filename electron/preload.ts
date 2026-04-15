@@ -108,6 +108,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   webrtcGetQr: () => ipcRenderer.invoke('webrtc-get-qr'),
   webrtcRelayToMobile: (deviceId: string, message: any) =>
     ipcRenderer.send('webrtc-relay-to-mobile', { deviceId, message }),
+  webrtcSendCommand: (deviceId: string, action: string, value?: any) =>
+    ipcRenderer.send('webrtc-relay-to-mobile', { deviceId, message: { type: 'command', action, value } }),
   webrtcBroadcastReading: (text: string, langs?: string[]) =>
     ipcRenderer.send('webrtc-broadcast-reading', { text, langs }),
   onWebRTCDeviceJoined: (cb: (data: { deviceId: string; deviceName: string }) => void) => {

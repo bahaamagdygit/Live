@@ -82,6 +82,7 @@ interface ElectronAPI {
   webrtcSignalStop?: () => Promise<{ success: boolean }>
   webrtcGetQr?: () => Promise<{ url: string; qrDataUrl: string }>
   webrtcRelayToMobile?: (deviceId: string, message: any) => void
+  webrtcSendCommand?: (deviceId: string, action: string, value?: any) => void
   webrtcBroadcastReading?: (text: string, langs?: string[]) => void
   onWebRTCDeviceJoined?: (cb: (data: { deviceId: string; deviceName: string }) => void) => () => void
   onWebRTCDeviceDisconnected?: (cb: (data: { deviceId: string }) => void) => () => void
