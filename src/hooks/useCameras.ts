@@ -136,8 +136,15 @@ export function useCameras(): UseCamerasReturn {
     try {
       let browserDevices: Camera[] = []
       try {
-        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
-        tempStream.getTracks().forEach((t) => t.stop())
+        // If no stream is active yet we need a temporary getUserMedia to unlock
+        // device labels. If a stream is already open we can enumerate directly —
+        // opening a generic getUserMedia without a deviceId can cause the OS to
+        // briefly activate the front/default camera, which on some platforms
+        // triggers a devicechange event and interrupts the active camera stream.
+        if (!streamRef.current) {
+          const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
+          tempStream.getTracks().forEach((t) => t.stop())
+        }
 
         const devices = await navigator.mediaDevices.enumerateDevices()
         browserDevices = devices

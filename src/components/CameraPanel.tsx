@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Camera, IpCameraPreset, IpCameraViewSettings, DEFAULT_IPCAM_VIEW } from '../types'
 import { CameraViewSettings, DEFAULT_CAM_VIEW } from '../hooks/useCameras'
-import { IpCamera, buildRtspFromPreset } from '../hooks/useIpCameras'
+import { IpCamera } from '../hooks/useIpCameras'
 import { CameraSwitchTransition } from './MainPreview'
 import { WebRTCCamera } from '../hooks/useWebRTCCameras'
 
@@ -205,7 +205,6 @@ export function CameraPanel({
   switchTransition, onSwitchTransitionChange,
   ipCameras, activeIpCamera, onSelectIpCamera, onDisconnectIpCamera, onReconnectIpCamera,
   onSaveAndReconnect, onUpdateIpCamView,
-  onMobileCamMjpegUrl,
   webrtcCameras = [], activeWebRTCDeviceId, onSelectWebRTCCamera, onDisconnectWebRTCCamera,
   webrtcQrDataUrl, webrtcServerUrl,
 }: CameraPanelProps) {
@@ -234,12 +233,8 @@ export function CameraPanel({
   const [editPreset, setEditPreset] = useState<IpCameraPreset | null>(null)
   // IP camera settings (zoom/pan) — which camera is open
   const [ipSettingsCamId, setIpSettingsCamId] = useState<string | null>(null)
-  // Mobile camera
-  const [mobileCamActive, setMobileCamActive] = useState(false)
-  const [mobileCamQr, setMobileCamQr] = useState<string | null>(null)
-  const [mobileCamPhoneUrl, setMobileCamPhoneUrl] = useState<string | null>(null)
-  const [mobileCamMjpegUrl, setMobileCamMjpegUrl] = useState<string | null>(null)
-  const [showMobileQr, setShowMobileQr] = useState(false)
+  // WebRTC add-phone modal
+  const [showWebRTCModal, setShowWebRTCModal] = useState(false)
 
   // Build RTSP URL from structured fields.
   // Credentials are percent-encoded so special chars (@, #, %, etc.) don't break the URL.
@@ -329,29 +324,6 @@ export function CameraPanel({
     }
   }
 
-  const handleMobileCamToggle = async () => {
-    if (!window.electronAPI) return
-    if (mobileCamActive) {
-      await window.electronAPI.mobileCamStop?.()
-      setMobileCamActive(false)
-      setMobileCamQr(null)
-      setMobileCamPhoneUrl(null)
-      setMobileCamMjpegUrl(null)
-      setShowMobileQr(false)
-      onMobileCamMjpegUrl(null)
-    } else {
-      const res = await window.electronAPI.mobileCamStart?.()
-      if (res?.success) {
-        setMobileCamActive(true)
-        setMobileCamQr(res.qrDataUrl ?? null)
-        setMobileCamPhoneUrl(res.phoneUrl ?? null)
-        setMobileCamMjpegUrl(res.mjpegUrl ?? null)
-        setShowMobileQr(true)
-        onMobileCamMjpegUrl(res.mjpegUrl ?? null)
-      }
-    }
-  }
-
   return (
     <div className="panel camera-panel">
       <div className="panel__header">
@@ -387,9 +359,9 @@ export function CameraPanel({
           >📡</button>
           <button
             type="button"
-            className={`btn btn--icon ${mobileCamActive ? 'btn--active' : ''}`}
-            onClick={handleMobileCamToggle}
-            title={mobileCamActive ? 'Stop mobile camera' : 'Add mobile phone camera'}
+            className={`btn btn--icon ${showWebRTCModal ? 'btn--active' : ''}`}
+            onClick={() => setShowWebRTCModal(s => !s)}
+            title="Add mobile phone camera"
           >📱</button>
           <button type="button" className="btn btn--icon" onClick={onRefresh} title="Refresh cameras" disabled={isLoading}>
             {isLoading ? '⟳' : '↺'}
@@ -400,43 +372,20 @@ export function CameraPanel({
       <div className="panel__content">
         {error && <div className="alert alert--error"><span>⚠️</span> {error}</div>}
 
-        {/* ── Mobile Camera QR Modal ── */}
-        {showMobileQr && mobileCamQr && (
+        {/* ── Add Mobile Phone Camera (WebRTC/WS) ── */}
+        {showWebRTCModal && webrtcQrDataUrl && (
           <div className="mobile-qr-card">
             <div className="mobile-qr-card__header">
-              <span>📱 Mobile Camera</span>
-              <button type="button" className="mobile-qr-card__close" onClick={() => setShowMobileQr(false)}>✕</button>
+              <span>📱 Add Mobile Phone Camera</span>
+              <button type="button" className="mobile-qr-card__close" onClick={() => setShowWebRTCModal(false)}>✕</button>
             </div>
-            <p className="mobile-qr-card__hint">Scan with your phone to stream camera</p>
-            <img src={mobileCamQr} className="mobile-qr-card__qr" alt="QR Code" />
-            <div className="mobile-qr-card__url" title={mobileCamPhoneUrl ?? ''}>
-              {mobileCamPhoneUrl}
-            </div>
-            <div className="mobile-qr-card__actions">
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={() => {
-                  if (mobileCamMjpegUrl) onSelectIpCamera({ id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true, mjpegUrl: mobileCamMjpegUrl })
-                  setShowMobileQr(false)
-                }}
-              >Use as Active Camera</button>
-            </div>
+            <p className="mobile-qr-card__hint">Scan with Church Cam app on your phone</p>
+            <img src={webrtcQrDataUrl} className="mobile-qr-card__qr" alt="QR Code" />
+            <div className="mobile-qr-card__url" title={webrtcServerUrl ?? ''}>{webrtcServerUrl}</div>
           </div>
         )}
 
-        {/* ── WebRTC Phone Cameras (Church Cam app) ── */}
-        {webrtcQrDataUrl && webrtcCameras.length === 0 && (
-          <div className="mobile-qr-card">
-            <div className="mobile-qr-card__header">
-              <span>📱 Church Cam App</span>
-              <span style={{fontSize:'11px',color:'#888'}}>ws connection</span>
-            </div>
-            <img src={webrtcQrDataUrl} className="mobile-qr-card__qr" alt="WebRTC QR" />
-            <div className="mobile-qr-card__url" title={webrtcServerUrl ?? ''}>{webrtcServerUrl}</div>
-            <p style={{fontSize:'11px',color:'#888',margin:'4px 0 0',textAlign:'center'}}>Scan with Church Cam app on your phone</p>
-          </div>
-        )}
+        {/* ── WebRTC Phone Cameras (unlimited) ── */}
         {webrtcCameras.length > 0 && (
           <div className="camera-list">
             {webrtcCameras.map(cam => (
@@ -448,30 +397,6 @@ export function CameraPanel({
                 onDisconnect={e => { e.stopPropagation(); onDisconnectWebRTCCamera?.(cam.deviceId) }}
               />
             ))}
-          </div>
-        )}
-
-        {/* ── Mobile Camera live card (when active and QR dismissed) ── */}
-        {mobileCamActive && !showMobileQr && mobileCamMjpegUrl && (
-          <div className="camera-list">
-            <div
-              className={`camera-card ${activeIpCamera?.id === '__mobile__' ? 'camera-card--active' : ''}`}
-              onClick={() => onSelectIpCamera({ id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true, mjpegUrl: mobileCamMjpegUrl })}
-            >
-              <div className="camera-preview">
-                <img src={mobileCamMjpegUrl} className="camera-preview__video" alt="Mobile Camera"
-                  onError={() => {}} />
-                {activeIpCamera?.id === '__mobile__' && <div className="camera-preview__active-badge">LIVE</div>}
-              </div>
-              <div className="camera-card__info">
-                {activeIpCamera?.id === '__mobile__' && <span className="camera-card__dot" />}
-                <span className="camera-card__label">📱 Mobile Camera</span>
-                <button type="button" className="camera-card__remove" title="Show QR"
-                  onClick={e => { e.stopPropagation(); setShowMobileQr(true) }}>QR</button>
-                <button type="button" className="camera-card__remove" title="Stop"
-                  onClick={e => { e.stopPropagation(); handleMobileCamToggle() }}>×</button>
-              </div>
-            </div>
           </div>
         )}
         {!error && cameras.length === 0 && !isLoading && (
