@@ -7,11 +7,10 @@ export interface WebRTCCamera {
   connected: boolean
 }
 
+// No STUN — both devices are on the same local WiFi network.
+// Direct LAN ICE candidates work with or without internet.
 const ICE_SERVERS = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-  ],
+  iceServers: [],
 }
 
 export function useWebRTCCameras() {
