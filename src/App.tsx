@@ -608,7 +608,7 @@ function App() {
             cameras={cameras.cameras}
             activeCamera={cameras.activeCamera}
             activeCameraStream={cameras.activeCameraStream}
-            onSelectCamera={cam => { setActiveIpCameraId(null); cameras.selectCamera(cam) }}
+            onSelectCamera={cam => { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); cameras.selectCamera(cam) }}
             onRefresh={cameras.refreshCameras}
             onRemoveCamera={cameras.removeCamera}
             onReorderCameras={cameras.reorderCameras}
@@ -624,7 +624,7 @@ function App() {
             onSwitchTransitionChange={setSwitchTransition}
             ipCameras={ipCameras.ipCameras}
             activeIpCamera={activeIpCamera}
-            onSelectIpCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(cam.id) }}
+            onSelectIpCamera={cam => { cameras.clearActiveCamera(); setActiveWebRTCDeviceId(null); setActiveIpCameraId(cam.id) }}
             onDisconnectIpCamera={id => { ipCameras.disconnectCamera(id); if (activeIpCameraId === id) setActiveIpCameraId(null) }}
             onReconnectIpCamera={ipCameras.reconnectCamera}
             onSaveAndReconnect={ipCameras.saveAndReconnect}
