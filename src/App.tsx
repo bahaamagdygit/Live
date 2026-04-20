@@ -5,7 +5,7 @@ import { TextControls } from './components/TextControls'
 import { StreamControls } from './components/StreamControls'
 import { SettingsModal } from './components/SettingsModal'
 import { VideoOverlayWidget } from './components/VideoOverlayWidget'
-import { useCameras } from './hooks/useCameras'
+import { useCameras, DEFAULT_CAM_VIEW, CameraViewSettings } from './hooks/useCameras'
 import { useIpCameras } from './hooks/useIpCameras'
 import { useWebRTCCameras } from './hooks/useWebRTCCameras'
 import { useStream } from './hooks/useStream'
@@ -97,6 +97,14 @@ function App() {
   const ipCameras = useIpCameras()
   const { cameras: webrtcCameraList, qrDataUrl: webrtcQrDataUrl, serverUrl: webrtcServerUrl } = useWebRTCCameras()
   const [activeWebRTCDeviceId, setActiveWebRTCDeviceId] = useState<string | null>(null)
+  const [webrtcCamViewMap, setWebrtcCamViewMap] = useState<Record<string, CameraViewSettings>>({})
+  const activeWebRTCCamView = activeWebRTCDeviceId ? (webrtcCamViewMap[activeWebRTCDeviceId] ?? DEFAULT_CAM_VIEW) : DEFAULT_CAM_VIEW
+  const setWebrtcCamView = useCallback((deviceId: string, patch: Partial<CameraViewSettings>) => {
+    setWebrtcCamViewMap(prev => ({
+      ...prev,
+      [deviceId]: { ...(prev[deviceId] ?? DEFAULT_CAM_VIEW), ...patch },
+    }))
+  }, [])
   const [activeIpCameraId, setActiveIpCameraId] = useState<string | null>(null)
   const [mobileCamMjpegUrl, setMobileCamMjpegUrl] = useState<string | null>(null)
   // Active IP camera — also handles the virtual '__mobile__' entry
@@ -634,7 +642,15 @@ function App() {
             activeWebRTCDeviceId={activeWebRTCDeviceId}
             onSelectWebRTCCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(null); setActiveWebRTCDeviceId(cam.deviceId) }}
             onDisconnectWebRTCCamera={id => { if (activeWebRTCDeviceId === id) setActiveWebRTCDeviceId(null) }}
-            onWebRTCSendCommand={(deviceId, action, value) => window.electronAPI?.webrtcSendCommand?.(deviceId, action, value)}
+            onWebRTCSendCommand={(deviceId, action, value) => {
+              window.electronAPI?.webrtcSendCommand?.(deviceId, action, value)
+              if (action === 'zoom' && typeof value === 'number') {
+                // Scale 1–8 from the phone's native zoom range to a CSS % (100–800%)
+                setWebrtcCamView(deviceId, { scale: Math.round(value * 100) })
+              }
+            }}
+            webrtcCamViewMap={webrtcCamViewMap}
+            onWebRTCCamViewChange={setWebrtcCamView}
             webrtcQrDataUrl={webrtcQrDataUrl}
             webrtcServerUrl={webrtcServerUrl}
           />
@@ -647,6 +663,7 @@ function App() {
             ipCameraMjpegUrl={activeWebRTCDeviceId ? undefined : activeIpCamera?.mjpegUrl}
             ipCamView={activeIpCamera?.view}
             webrtcStream={activeWebRTCDeviceId ? (webrtcCameraList.find(c => c.deviceId === activeWebRTCDeviceId)?.stream ?? null) : null}
+            webrtcCamView={activeWebRTCDeviceId ? activeWebRTCCamView : undefined}
             overlaySettings={overlaySettings}
             logoSettings={logoSettings}
             cameraFallback={cameraFallback}

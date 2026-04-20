@@ -45,7 +45,6 @@
 }
 
 /* IP camera MJPEG <img> — object-fit variants */
-.presentation-camera--ipcam { transform: none; }
 .presentation-camera--fit-cover    { object-fit: cover; }
 .presentation-camera--fit-contain  { object-fit: contain; }
 .presentation-camera--fit-fill     { object-fit: fill; }

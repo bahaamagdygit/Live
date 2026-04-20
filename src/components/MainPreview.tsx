@@ -16,6 +16,7 @@ interface MainPreviewProps {
   ipCameraMjpegUrl?: string
   ipCamView?: CamView
   webrtcStream?: MediaStream | null
+  webrtcCamView?: CamView
   overlaySettings: OverlaySettings
   logoSettings: LogoSettings
   cameraFallback: CameraFallbackSettings
@@ -45,6 +46,7 @@ export function MainPreview({
   cameraDeviceId,
   ipCameraMjpegUrl,
   webrtcStream,
+  webrtcCamView,
   overlaySettings,
   logoSettings,
   cameraFallback,
@@ -231,7 +233,13 @@ export function MainPreview({
             ref={webrtcVideoRef}
             className="presentation-camera presentation-camera--ipcam"
             autoPlay playsInline muted
-            style={{ objectFit: 'cover', display: !showFallback ? 'block' : 'none' }}
+            style={{
+              objectFit: webrtcCamView?.fit ?? 'cover',
+              display: !showFallback ? 'block' : 'none',
+              transform: `scale(${(webrtcCamView?.scale ?? 100) / 100}) translate(${webrtcCamView?.offsetX ?? 0}%, ${webrtcCamView?.offsetY ?? 0}%) scaleX(${webrtcCamView?.flipH ? -1 : 1}) scaleY(${webrtcCamView?.flipV ? -1 : 1})`,
+              transformOrigin: 'center center',
+              filter: `brightness(${webrtcCamView?.brightness ?? 100}%) contrast(${webrtcCamView?.contrast ?? 100}%) saturate(${webrtcCamView?.saturation ?? 100}%)`,
+            }}
           />
         )}
 

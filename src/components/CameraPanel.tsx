@@ -39,6 +39,8 @@ interface CameraPanelProps {
   onSelectWebRTCCamera?: (cam: WebRTCCamera) => void
   onDisconnectWebRTCCamera?: (deviceId: string) => void
   onWebRTCSendCommand?: (deviceId: string, action: string, value?: any) => void
+  webrtcCamViewMap?: Record<string, CameraViewSettings>
+  onWebRTCCamViewChange?: (deviceId: string, patch: Partial<CameraViewSettings>) => void
   webrtcQrDataUrl?: string
   webrtcServerUrl?: string
 }
@@ -113,23 +115,27 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragO
   )
 }
 
-function WebRTCCameraCard({ cam, isActive, onSelect, onDisconnect, onSendCommand }: {
+function WebRTCCameraCard({ cam, isActive, onSelect, onDisconnect, onSendCommand, camView, onCamViewChange }: {
   cam: WebRTCCamera
   isActive: boolean
   onSelect: () => void
   onDisconnect: (e: React.MouseEvent) => void
   onSendCommand?: (action: string, value?: any) => void
+  camView: CameraViewSettings
+  onCamViewChange: (patch: Partial<CameraViewSettings>) => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [zoom, setZoom] = useState(1)
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = cam.stream
   }, [cam.stream])
 
+  // zoom range 1–8 maps 1:1 to phone native zoom; scale % = zoom * 100
+  const zoom = (camView.scale / 100)
+
   const sendZoom = (z: number) => {
     const clamped = Math.max(1, Math.min(8, z))
-    setZoom(clamped)
+    onCamViewChange({ scale: Math.round(clamped * 100) })
     onSendCommand?.('zoom', clamped)
   }
 
@@ -225,7 +231,7 @@ export function CameraPanel({
   ipCameras, activeIpCamera, onSelectIpCamera, onDisconnectIpCamera, onReconnectIpCamera,
   onSaveAndReconnect, onUpdateIpCamView,
   webrtcCameras = [], activeWebRTCDeviceId, onSelectWebRTCCamera, onDisconnectWebRTCCamera,
-  onWebRTCSendCommand,
+  onWebRTCSendCommand, webrtcCamViewMap, onWebRTCCamViewChange,
   webrtcQrDataUrl, webrtcServerUrl,
 }: CameraPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
@@ -416,6 +422,8 @@ export function CameraPanel({
                 onSelect={() => onSelectWebRTCCamera?.(cam)}
                 onDisconnect={e => { e.stopPropagation(); onDisconnectWebRTCCamera?.(cam.deviceId) }}
                 onSendCommand={(action, value) => onWebRTCSendCommand?.(cam.deviceId, action, value)}
+                camView={webrtcCamViewMap?.[cam.deviceId] ?? DEFAULT_CAM_VIEW}
+                onCamViewChange={patch => onWebRTCCamViewChange?.(cam.deviceId, patch)}
               />
             ))}
           </div>
