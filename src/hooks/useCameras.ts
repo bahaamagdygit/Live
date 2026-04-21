@@ -4,7 +4,8 @@ import { Camera } from '../types'
 export interface CameraViewSettings {
   resolution: '4k' | '1080p' | '720p' | '480p'
   frameRate: 30 | 60
-  scale: number         // 10–300 %
+  scale: number         // 10–300 % — framing zoom (CSS fallback, rarely used now)
+  zoom: number          // 1.0–maxZoom — real camera zoom (hardware or canvas-based)
   offsetX: number       // -100 to 100 %
   offsetY: number       // -100 to 100 %
   fit: 'cover' | 'contain' | 'fill' | 'none'
@@ -19,6 +20,7 @@ export const DEFAULT_CAM_VIEW: CameraViewSettings = {
   resolution: '1080p',
   frameRate: 30,
   scale: 100,
+  zoom: 1,
   offsetX: 0,
   offsetY: 0,
   fit: 'cover',
@@ -44,6 +46,9 @@ interface UseCamerasReturn {
   setCamView: (patch: Partial<CameraViewSettings>) => void
   disconnectedIds: Set<string>
   clearActiveCamera: () => void
+  // Hardware-zoom info for the active camera — lets UI pick the right slider range
+  // and lets consumers decide whether to fall back to canvas-based software zoom.
+  zoomCaps: { supported: boolean; min: number; max: number; step: number }
 }
 
 export function useCameras(): UseCamerasReturn {
@@ -61,6 +66,9 @@ export function useCameras(): UseCamerasReturn {
   const activeCameraRef = useRef<Camera | null>(null)
   const camViewMapRef = useRef<Record<string, CameraViewSettings>>({})
   const selectCameraByIdRef = useRef<(camera: Camera, overrideView?: CameraViewSettings) => Promise<void>>(async () => {})
+  const [zoomCaps, setZoomCaps] = useState<{ supported: boolean; min: number; max: number; step: number }>(
+    { supported: false, min: 1, max: 4, step: 0.1 }
+  )
 
   useEffect(() => { camViewMapRef.current = camViewMap }, [camViewMap])
 
@@ -112,6 +120,29 @@ export function useCameras(): UseCamerasReturn {
             next.delete(camera.deviceId)
             return next
           })
+          // Probe hardware zoom capabilities on the new video track.
+          // Not all browsers/cameras expose `zoom` — when absent, the UI
+          // will use canvas-based software zoom instead.
+          try {
+            const track = stream.getVideoTracks()[0]
+            const caps = (track?.getCapabilities?.() ?? {}) as any
+            if (caps && typeof caps.zoom === 'object' && caps.zoom !== null) {
+              const min  = typeof caps.zoom.min  === 'number' ? caps.zoom.min  : 1
+              const max  = typeof caps.zoom.max  === 'number' ? caps.zoom.max  : 4
+              const step = typeof caps.zoom.step === 'number' && caps.zoom.step > 0 ? caps.zoom.step : 0.1
+              setZoomCaps({ supported: true, min, max, step })
+              // Restore any saved zoom for this camera
+              const savedZoom = view.zoom ?? 1
+              const clamped = Math.max(min, Math.min(max, savedZoom))
+              if (clamped > min) {
+                try { await track.applyConstraints({ advanced: [{ zoom: clamped } as any] }) } catch {}
+              }
+            } else {
+              setZoomCaps({ supported: false, min: 1, max: 4, step: 0.1 })
+            }
+          } catch {
+            setZoomCaps({ supported: false, min: 1, max: 4, step: 0.1 })
+          }
           return
         } catch (err: any) {
           lastErr = err
@@ -240,6 +271,16 @@ export function useCameras(): UseCamerasReturn {
     selectCameraById(activeCameraRef.current, camView)
   }, [camView.resolution, camView.frameRate])
 
+  // Apply hardware zoom live when the user drags the zoom slider on a camera
+  // that supports it. Software (canvas) zoom is applied in the preview components.
+  useEffect(() => {
+    if (!streamRef.current || !zoomCaps.supported) return
+    const track = streamRef.current.getVideoTracks()[0]
+    if (!track) return
+    const clamped = Math.max(zoomCaps.min, Math.min(zoomCaps.max, camView.zoom ?? 1))
+    track.applyConstraints({ advanced: [{ zoom: clamped } as any] }).catch(() => {})
+  }, [camView.zoom, zoomCaps.supported, zoomCaps.min, zoomCaps.max])
+
   const selectCamera = useCallback(
     async (camera: Camera) => {
       const savedView = camViewMap[camera.deviceId] ?? DEFAULT_CAM_VIEW
@@ -297,5 +338,6 @@ export function useCameras(): UseCamerasReturn {
     setCamView,
     disconnectedIds,
     clearActiveCamera,
+    zoomCaps,
   }
 }

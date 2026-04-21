@@ -343,6 +343,8 @@ function App() {
       cameraSaturation: cameras.camView.saturation,
       cameraFlipH: cameras.camView.flipH,
       cameraFlipV: cameras.camView.flipV,
+      cameraZoom: cameras.camView.zoom,
+      cameraHardwareZoomSupported: cameras.zoomCaps.supported,
       logoBase64: logoSettings.base64 || '',
       logoPosition: logoSettings.position,
       logoSize: logoSettings.size,
@@ -355,7 +357,7 @@ function App() {
       fallbackFit: cameraFallback.fit,
       manualFallback,
     })
-  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, logoSettings, cameraFallback, manualFallback, activeIpCamera])
+  }, [overlaySettings, isPresentationOpen, slides.currentSlideIndex, slides.slides.length, cameras.activeCamera, cameras.camView, cameras.zoomCaps, logoSettings, cameraFallback, manualFallback, activeIpCamera])
 
   // ── PPTX Controller window ──────────────────────────────────────────────────
 
@@ -464,6 +466,8 @@ function App() {
           cameraSaturation: cameras.camView.saturation,
           cameraFlipH: cameras.camView.flipH,
           cameraFlipV: cameras.camView.flipV,
+          cameraZoom: cameras.camView.zoom,
+          cameraHardwareZoomSupported: cameras.zoomCaps.supported,
           logoBase64: logoSettings.base64 || '',
           logoPosition: logoSettings.position,
           logoSize: logoSettings.size,
@@ -625,6 +629,7 @@ function App() {
             error={cameras.cameraError}
             camView={cameras.camView}
             onCamViewChange={patch => cameras.setCamView(patch)}
+            zoomCaps={cameras.zoomCaps}
             manualFallback={manualFallback}
             onToggleManualFallback={() => setManualFallback(v => !v)}
             disconnectedIds={cameras.disconnectedIds}
@@ -643,11 +648,10 @@ function App() {
             onSelectWebRTCCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(null); setActiveWebRTCDeviceId(cam.deviceId) }}
             onDisconnectWebRTCCamera={id => { if (activeWebRTCDeviceId === id) setActiveWebRTCDeviceId(null) }}
             onWebRTCSendCommand={(deviceId, action, value) => {
+              // The phone applies the zoom at the camera sensor, so the WebRTC
+              // track the desktop receives is already zoomed. No CSS-scale hack
+              // needed — the value is saved as camView.zoom by CameraPanel.
               window.electronAPI?.webrtcSendCommand?.(deviceId, action, value)
-              if (action === 'zoom' && typeof value === 'number') {
-                // Scale 1–8 from the phone's native zoom range to a CSS % (100–800%)
-                setWebrtcCamView(deviceId, { scale: Math.round(value * 100) })
-              }
             }}
             webrtcCamViewMap={webrtcCamViewMap}
             onWebRTCCamViewChange={setWebrtcCamView}
@@ -670,6 +674,7 @@ function App() {
             manualFallback={manualFallback}
             switchTransition={switchTransition}
             camView={cameras.camView}
+            hardwareZoomSupported={cameras.zoomCaps.supported}
             videoElMountRef={videoElMountRef}
           />
         </div>

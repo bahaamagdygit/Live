@@ -1,10 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
+export interface WebRTCCameraCapabilities {
+  minZoom: number
+  maxZoom: number
+  step: number
+}
+
 export interface WebRTCCamera {
   deviceId: string
   deviceName: string
   stream: MediaStream | null
   connected: boolean
+  capabilities?: WebRTCCameraCapabilities
 }
 
 // No STUN — both devices are on the same local WiFi network.
@@ -126,6 +133,17 @@ export function useWebRTCCameras() {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(data.candidate))
         } catch {}
+      } else if (data.type === 'camera_capabilities') {
+        const { minZoom, maxZoom, step } = data
+        setCameras(prev => prev.map(c =>
+          c.deviceId === data.deviceId
+            ? { ...c, capabilities: {
+                minZoom: typeof minZoom === 'number' ? minZoom : 1,
+                maxZoom: typeof maxZoom === 'number' ? maxZoom : 4,
+                step:    typeof step    === 'number' ? step    : 0.1,
+              } }
+            : c,
+        ))
       }
     })
 

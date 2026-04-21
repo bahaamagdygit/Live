@@ -25,6 +25,8 @@ interface PresentationData {
   cameraSaturation?: number
   cameraFlipH?: boolean
   cameraFlipV?: boolean
+  cameraZoom?: number
+  cameraHardwareZoomSupported?: boolean
   ipCameraMjpegUrl?: string
   ipCamScale?: number
   ipCamX?: number
@@ -156,6 +158,7 @@ export default function PresentationApp() {
   const streamRef = useRef<MediaStream | null>(null)
   const [cameraFailed, setCameraFailed] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const zoomCanvasRef = useRef<HTMLCanvasElement>(null)
   const [screenSize, setScreenSize] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   useEffect(() => {
@@ -314,6 +317,43 @@ export default function PresentationApp() {
     }
   }, [data.cameraDeviceId])
 
+  // Apply hardware zoom live on the presentation window's own stream
+  useEffect(() => {
+    if (!streamRef.current) return
+    if (!data.cameraHardwareZoomSupported) return
+    const track = streamRef.current.getVideoTracks()[0]
+    if (!track) return
+    const z = data.cameraZoom ?? 1
+    if (z <= 1) return
+    track.applyConstraints({ advanced: [{ zoom: z } as any] }).catch(() => {})
+  }, [data.cameraZoom, data.cameraHardwareZoomSupported, data.cameraDeviceId])
+
+  // Software zoom — mirror the main window: draw cropped video frames to a canvas
+  // whenever the active camera has no hardware zoom and zoom > 1.
+  const useSoftwareZoom = !data.cameraHardwareZoomSupported && (data.cameraZoom ?? 1) > 1.001
+  useEffect(() => {
+    if (!useSoftwareZoom) return
+    const video = videoRef.current
+    const canvas = zoomCanvasRef.current
+    if (!video || !canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    let rafId = 0
+    const render = () => {
+      rafId = requestAnimationFrame(render)
+      const vw = video.videoWidth, vh = video.videoHeight
+      if (!vw || !vh || video.readyState < 2) return
+      if (canvas.width !== vw) canvas.width = vw
+      if (canvas.height !== vh) canvas.height = vh
+      const z = Math.max(1, data.cameraZoom ?? 1)
+      const sw = vw / z, sh = vh / z
+      const sx = (vw - sw) / 2, sy = (vh - sh) / 2
+      try { ctx.drawImage(video, sx, sy, sw, sh, 0, 0, vw, vh) } catch {}
+    }
+    rafId = requestAnimationFrame(render)
+    return () => cancelAnimationFrame(rafId)
+  }, [useSoftwareZoom, data.cameraZoom])
+
   // Listen for updates from main process
   useEffect(() => {
     if (!window.electronAPI?.onPresentationUpdate) return
@@ -393,7 +433,19 @@ export default function PresentationApp() {
             transform: `scale(${(data.cameraScale ?? 100) / 100}) translate(${data.cameraX ?? 0}%, ${data.cameraY ?? 0}%) scaleX(${data.cameraFlipH ? -1 : 1}) scaleY(${data.cameraFlipV ? -1 : 1})`,
             transformOrigin: 'center center',
             filter: `brightness(${data.cameraBrightness ?? 100}%) contrast(${data.cameraContrast ?? 100}%) saturate(${data.cameraSaturation ?? 100}%)`,
-            display: (!cameraFailed && !data.manualFallback && !data.ipCameraMjpegUrl) ? 'block' : 'none',
+            display: (!cameraFailed && !data.manualFallback && !data.ipCameraMjpegUrl && !useSoftwareZoom) ? 'block' : 'none',
+          }}
+        />
+        {/* Software-zoom canvas — same transforms so framing/flip/brightness stay consistent */}
+        <canvas
+          ref={zoomCanvasRef}
+          className="presentation-camera"
+          style={{
+            objectFit: data.cameraFit ?? 'cover',
+            transform: `scale(${(data.cameraScale ?? 100) / 100}) translate(${data.cameraX ?? 0}%, ${data.cameraY ?? 0}%) scaleX(${data.cameraFlipH ? -1 : 1}) scaleY(${data.cameraFlipV ? -1 : 1})`,
+            transformOrigin: 'center center',
+            filter: `brightness(${data.cameraBrightness ?? 100}%) contrast(${data.cameraContrast ?? 100}%) saturate(${data.cameraSaturation ?? 100}%)`,
+            display: (!cameraFailed && !data.manualFallback && !data.ipCameraMjpegUrl && useSoftwareZoom) ? 'block' : 'none',
           }}
         />
 

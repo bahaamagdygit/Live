@@ -18,6 +18,8 @@ interface CameraPanelProps {
   error: string | null
   camView: CameraViewSettings
   onCamViewChange: (patch: Partial<CameraViewSettings>) => void
+  // Hardware-zoom caps for the active local camera. Software fallback covers 1.0–4.0 when unsupported.
+  zoomCaps?: { supported: boolean; min: number; max: number; step: number }
   manualFallback: boolean
   onToggleManualFallback: () => void
   disconnectedIds: Set<string>
@@ -130,13 +132,17 @@ function WebRTCCameraCard({ cam, isActive, onSelect, onDisconnect, onSendCommand
     if (videoRef.current) videoRef.current.srcObject = cam.stream
   }, [cam.stream])
 
-  // zoom range 1–8 maps 1:1 to phone native zoom; scale % = zoom * 100
-  const zoom = (camView.scale / 100)
+  // Slider range: use phone-reported capabilities when available, else 1.0–4.0
+  const minZoom = cam.capabilities?.minZoom ?? 1
+  const maxZoom = cam.capabilities?.maxZoom ?? 4
+  const step    = cam.capabilities?.step    ?? 0.1
+  const zoom = camView.zoom ?? 1
 
   const sendZoom = (z: number) => {
-    const clamped = Math.max(1, Math.min(8, z))
-    onCamViewChange({ scale: Math.round(clamped * 100) })
-    onSendCommand?.('zoom', clamped)
+    const clamped = Math.max(minZoom, Math.min(maxZoom, z))
+    const rounded = Math.round(clamped * 10) / 10
+    onCamViewChange({ zoom: rounded })
+    onSendCommand?.('set_zoom', rounded)
   }
 
   return (
@@ -161,12 +167,22 @@ function WebRTCCameraCard({ cam, isActive, onSelect, onDisconnect, onSendCommand
           <button type="button" className="camera-card__remove" onClick={e => { e.stopPropagation(); onDisconnect(e) }} title="Disconnect">×</button>
         </div>
       </div>
-      {/* Controls row — independent from select click */}
+      {/* Controls row — slider + flip */}
       {cam.connected && (
         <div className="camera-card__controls">
-          <button type="button" title="Zoom out" onClick={() => sendZoom(zoom - 0.5)}>−</button>
+          <button type="button" title="Zoom out" onClick={() => sendZoom(zoom - step)}>−</button>
+          <input
+            type="range"
+            title={`Zoom ${zoom.toFixed(1)}×`}
+            min={minZoom}
+            max={maxZoom}
+            step={step}
+            value={zoom}
+            onChange={e => sendZoom(Number(e.target.value))}
+            style={{ flex: 1, minWidth: 80 }}
+          />
           <span className="camera-card__zoom-label">{zoom.toFixed(1)}×</span>
-          <button type="button" title="Zoom in" onClick={() => sendZoom(zoom + 0.5)}>+</button>
+          <button type="button" title="Zoom in" onClick={() => sendZoom(zoom + step)}>+</button>
           <button type="button" title="Flip camera" onClick={() => onSendCommand?.('flip')}>🔄</button>
         </div>
       )}
@@ -226,6 +242,7 @@ export function CameraPanel({
   cameras, activeCamera, activeCameraStream, onSelectCamera, onRefresh, onRemoveCamera,
   onReorderCameras, onAddCamera,
   isLoading, error, camView, onCamViewChange,
+  zoomCaps,
   manualFallback, onToggleManualFallback, disconnectedIds,
   switchTransition, onSwitchTransitionChange,
   ipCameras, activeIpCamera, onSelectIpCamera, onDisconnectIpCamera, onReconnectIpCamera,
@@ -758,9 +775,24 @@ export function CameraPanel({
             </div>
 
             <div className="cam-settings__sliders">
+              {/* Real camera zoom — hardware when supported, canvas-based software zoom otherwise.
+                  Range is 1.0–max (4.0 software, camera's reported max for hardware). */}
               <div className="cam-settings__slider-row">
-                <label className="cam-settings__label">Zoom {camView.scale}%</label>
-                <input type="range" title="Zoom" min={10} max={300} value={camView.scale}
+                <label className="cam-settings__label">
+                  Zoom {(camView.zoom ?? 1).toFixed(1)}×
+                  {zoomCaps?.supported ? '' : ' (SW)'}
+                </label>
+                <input type="range" title="Camera zoom"
+                  min={zoomCaps?.min ?? 1}
+                  max={zoomCaps?.supported ? (zoomCaps?.max ?? 4) : 4}
+                  step={zoomCaps?.step ?? 0.1}
+                  value={camView.zoom ?? 1}
+                  onChange={e => set({ zoom: Number(e.target.value) })} />
+                <button type="button" className="cam-settings__rst" onClick={() => set({ zoom: 1 })}>↺</button>
+              </div>
+              <div className="cam-settings__slider-row">
+                <label className="cam-settings__label">Framing {camView.scale}%</label>
+                <input type="range" title="Framing scale" min={10} max={300} value={camView.scale}
                   onChange={e => set({ scale: Number(e.target.value) })} />
                 <button type="button" className="cam-settings__rst" onClick={() => set({ scale: 100 })}>↺</button>
               </div>

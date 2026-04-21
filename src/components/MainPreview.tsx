@@ -10,6 +10,7 @@ interface CamView {
   fit: 'cover' | 'contain' | 'fill' | 'none'
   brightness: number; contrast: number; saturation: number
   flipH: boolean; flipV: boolean
+  zoom?: number
 }
 interface MainPreviewProps {
   cameraDeviceId: string
@@ -23,6 +24,9 @@ interface MainPreviewProps {
   manualFallback?: boolean
   switchTransition?: CameraSwitchTransition
   camView?: CamView
+  // When the active camera has no hardware zoom, the preview renders the
+  // video through a canvas cropped to simulate zoom instead of using CSS scale.
+  hardwareZoomSupported?: boolean
   videoElMountRef?: React.RefObject<((el: HTMLVideoElement | null) => void) | undefined>
 }
 
@@ -54,6 +58,7 @@ export function MainPreview({
   switchTransition = 'zoom',
   camView,
   ipCamView,
+  hardwareZoomSupported = false,
   videoElMountRef,
 }: MainPreviewProps) {
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
@@ -61,6 +66,8 @@ export function MainPreview({
   const containerRef = useRef<HTMLDivElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // Canvas that renders zoomed frames when the camera lacks hardware zoom
+  const zoomCanvasRef = useRef<HTMLCanvasElement>(null)
   const [previewSize, setPreviewSize] = useState({ w: 960, h: 540 })
   const [cameraFailed, setCameraFailed] = useState(false)
   const [isSwitching, setIsSwitching] = useState(false)
@@ -197,6 +204,36 @@ export function MainPreview({
   const contrast = camView?.contrast ?? 100
   const saturation = camView?.saturation ?? 100
   const fit = camView?.fit ?? 'cover'
+  const zoomLevel = camView?.zoom ?? 1
+  // Use canvas-based software zoom when the camera has no hardware zoom and the user has dialed in > 1×
+  const useSoftwareZoom = !hardwareZoomSupported && zoomLevel > 1.001
+
+  // Drive the software-zoom canvas via requestAnimationFrame. Each frame crops
+  // a centered region of the source video (size = videoSize / zoom) and draws
+  // it scaled to fill the canvas, which is equivalent to a real zoom.
+  useEffect(() => {
+    if (!useSoftwareZoom) return
+    const video = cameraVideoRef.current
+    const canvas = zoomCanvasRef.current
+    if (!video || !canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let rafId = 0
+    const render = () => {
+      rafId = requestAnimationFrame(render)
+      const vw = video.videoWidth, vh = video.videoHeight
+      if (!vw || !vh || video.readyState < 2) return
+      if (canvas.width !== vw) canvas.width = vw
+      if (canvas.height !== vh) canvas.height = vh
+      const z = Math.max(1, zoomLevel)
+      const sw = vw / z, sh = vh / z
+      const sx = (vw - sw) / 2, sy = (vh - sh) / 2
+      try { ctx.drawImage(video, sx, sy, sw, sh, 0, 0, vw, vh) } catch {}
+    }
+    rafId = requestAnimationFrame(render)
+    return () => cancelAnimationFrame(rafId)
+  }, [useSoftwareZoom, zoomLevel])
 
   const scaleFactor = Math.min(previewSize.w / PRESENT_W, previewSize.h / PRESENT_H)
   const stageLeft = (previewSize.w - PRESENT_W * scaleFactor) / 2
@@ -245,24 +282,39 @@ export function MainPreview({
 
         {/* USB camera feed */}
         {!ipCameraMjpegUrl && !webrtcStream && (
-          <video
-            ref={cameraVideoRef}
-            className={[
-              'presentation-camera',
-              switchTransition !== 'none' ? `presentation-camera--switch-${switchTransition}` : '',
-              isSwitching ? 'presentation-camera--switching-out' : '',
-            ].filter(Boolean).join(' ')}
-            autoPlay playsInline muted
-            style={{
-              objectFit: fit,
-              transform: isSwitching
-                ? undefined
-                : `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
-              transformOrigin: 'center center',
-              filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
-              display: !showFallback ? 'block' : 'none',
-            }}
-          />
+          <>
+            <video
+              ref={cameraVideoRef}
+              className={[
+                'presentation-camera',
+                switchTransition !== 'none' ? `presentation-camera--switch-${switchTransition}` : '',
+                isSwitching ? 'presentation-camera--switching-out' : '',
+              ].filter(Boolean).join(' ')}
+              autoPlay playsInline muted
+              style={{
+                objectFit: fit,
+                transform: isSwitching
+                  ? undefined
+                  : `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
+                transformOrigin: 'center center',
+                filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
+                // Hide the raw <video> whenever the canvas-based software zoom is active
+                display: !showFallback && !useSoftwareZoom ? 'block' : 'none',
+              }}
+            />
+            {/* Software-zoom canvas — drawn via rAF when hardware zoom is unavailable */}
+            <canvas
+              ref={zoomCanvasRef}
+              className="presentation-camera"
+              style={{
+                objectFit: fit,
+                transform: `scale(${camScale / 100}) translate(${offsetX}%, ${offsetY}%) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
+                transformOrigin: 'center center',
+                filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
+                display: !showFallback && useSoftwareZoom ? 'block' : 'none',
+              }}
+            />
+          </>
         )}
 
         {/* IP camera MJPEG feed */}

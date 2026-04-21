@@ -146,6 +146,13 @@ function startWebRTCSignalServer() {
           mainWindow?.webContents.send('webrtc-signal', { type: 'ice-candidate', deviceId, candidate: msg.candidate })
           break
         }
+        default: {
+          // Forward any other messages (e.g. camera_capabilities) to the renderer
+          if (deviceId) {
+            mainWindow?.webContents.send('webrtc-signal', { ...msg, deviceId })
+          }
+          break
+        }
       }
     })
 
