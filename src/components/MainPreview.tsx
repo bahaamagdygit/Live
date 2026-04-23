@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, memo } from 'react'
 import { OverlaySettings, LogoSettings, CameraFallbackSettings } from '../types'
 import { ChurchBorderOverlay } from '../presentation/PresentationApp'
+import { MobileCameraView, filtersToCss } from '../hooks/useMobileCameras'
 import '../presentation/presentation.css'
 
 export type CameraSwitchTransition = 'fade' | 'zoom' | 'slide-left' | 'slide-right' | 'none'
@@ -28,6 +29,11 @@ interface MainPreviewProps {
   // video through a canvas cropped to simulate zoom instead of using CSS scale.
   hardwareZoomSupported?: boolean
   videoElMountRef?: React.RefObject<((el: HTMLVideoElement | null) => void) | undefined>
+  // ── Mobile-bridge source (new LAN architecture) ──────────────────────────
+  mobileMjpegUrl?: string | null
+  mobileView?: MobileCameraView
+  // Current UI orientation reported by the phone; desktop rotates the feed to match.
+  mobileOrientation?: 'portrait' | 'portrait-upside-down' | 'landscape-left' | 'landscape-right'
 }
 
 const PRESENT_W = 1920
@@ -60,6 +66,9 @@ export function MainPreview({
   ipCamView,
   hardwareZoomSupported = false,
   videoElMountRef,
+  mobileMjpegUrl,
+  mobileView,
+  mobileOrientation = 'landscape-left',
 }: MainPreviewProps) {
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
   const webrtcVideoRef = useRef<HTMLVideoElement>(null)
@@ -281,7 +290,7 @@ export function MainPreview({
         )}
 
         {/* USB camera feed */}
-        {!ipCameraMjpegUrl && !webrtcStream && (
+        {!ipCameraMjpegUrl && !webrtcStream && !mobileMjpegUrl && (
           <>
             <video
               ref={cameraVideoRef}
@@ -317,8 +326,40 @@ export function MainPreview({
           </>
         )}
 
+        {/* Mobile phone camera feed (MJPEG from local bridge) */}
+        {mobileMjpegUrl && !showFallback && (() => {
+          // Phone camera sensors ship frames in their landscape-native
+          // orientation. Rotate on-desktop so the feed matches how the
+          // operator is holding the phone.
+          const rotate =
+            mobileOrientation === 'portrait'              ?  90 :
+            mobileOrientation === 'portrait-upside-down'  ? -90 :
+            mobileOrientation === 'landscape-right'       ? 180 :
+            0
+          return (
+            <img
+              src={mobileMjpegUrl}
+              className="presentation-camera presentation-camera--ipcam"
+              alt=""
+              style={{
+                objectFit: mobileView?.fit ?? 'cover',
+                transform: [
+                  `rotate(${rotate}deg)`,
+                  `scale(${Math.max(1, mobileView?.zoom ?? 1)})`,
+                  `translate(${mobileView?.offsetX ?? 0}%, ${mobileView?.offsetY ?? 0}%)`,
+                  `scaleX(${mobileView?.flipH ? -1 : 1})`,
+                  `scaleY(${mobileView?.flipV ? -1 : 1})`,
+                ].join(' '),
+                transformOrigin: 'center center',
+                filter: mobileView ? filtersToCss(mobileView.filters) : undefined,
+                opacity: mobileView ? mobileView.filters.opacity / 100 : 1,
+              }}
+            />
+          )
+        })()}
+
         {/* IP camera MJPEG feed */}
-        {ipCameraMjpegUrl && !webrtcStream && !showFallback && (
+        {ipCameraMjpegUrl && !webrtcStream && !mobileMjpegUrl && !showFallback && (
           <img
             src={ipCameraMjpegUrl}
             className={`presentation-camera presentation-camera--ipcam presentation-camera--fit-${ipCamView?.fit ?? 'cover'}`}

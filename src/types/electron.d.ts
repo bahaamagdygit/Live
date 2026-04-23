@@ -107,6 +107,9 @@ interface ElectronAPI {
   onMobileRequestState?: (cb: (d: { deviceId: string }) => void) => () => void
 }
 
+export type MobileDeviceOrientation =
+  | 'portrait' | 'portrait-upside-down' | 'landscape-left' | 'landscape-right'
+
 export interface MobileBridgeDevice {
   deviceId: string
   deviceName: string
@@ -114,6 +117,7 @@ export interface MobileBridgeDevice {
   lastPong: number
   latencyMs: number
   lastFrameAt: number
+  orientation: MobileDeviceOrientation
   capabilities: {
     zoom?:     { min: number; max: number; step: number; neutral: number }
     exposure?: { min: number; max: number; step: number }

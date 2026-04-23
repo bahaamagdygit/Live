@@ -1,6 +1,25 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Camera } from '../types'
 
+// Persist the set of camera deviceIds the user has removed from the list, so
+// they stay hidden across refreshes and app restarts. Virtual cameras like
+// OMEN Cam & Voice that appear in Windows but don't produce video can be
+// dismissed once and forgotten about.
+const HIDDEN_CAMERAS_KEY = 'churchlive.hiddenCameras'
+
+function loadHiddenCameras(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_CAMERAS_KEY)
+    if (!raw) return new Set()
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? new Set(arr.filter(s => typeof s === 'string')) : new Set()
+  } catch { return new Set() }
+}
+
+function saveHiddenCameras(set: Set<string>): void {
+  try { localStorage.setItem(HIDDEN_CAMERAS_KEY, JSON.stringify(Array.from(set))) } catch {}
+}
+
 export interface CameraViewSettings {
   resolution: '4k' | '1080p' | '720p' | '480p'
   frameRate: 30 | 60
@@ -60,6 +79,9 @@ export function useCameras(): UseCamerasReturn {
   const [camViewMap, setCamViewMap] = useState<Record<string, CameraViewSettings>>({})
   // deviceIds that failed to open
   const [disconnectedIds, setDisconnectedIds] = useState<Set<string>>(new Set())
+  // Persistent set of deviceIds the user has removed. Read once at mount; kept
+  // via a ref so refreshCameras always sees the latest value.
+  const hiddenIdsRef = useRef<Set<string>>(loadHiddenCameras())
 
   const streamRef = useRef<MediaStream | null>(null)
   const camViewRef = useRef<CameraViewSettings>(DEFAULT_CAM_VIEW)
@@ -197,13 +219,15 @@ export function useCameras(): UseCamerasReturn {
         } catch (err) {}
       }
 
-      const merged = browserDevices.length > 0 ? browserDevices : electronDevices
+      const hidden = hiddenIdsRef.current
+      const mergedRaw = browserDevices.length > 0 ? browserDevices : electronDevices
+      // Drop cameras the user has explicitly removed in the past.
+      const merged = mergedRaw.filter(c => !hidden.has(c.deviceId))
 
       // Merge with existing manually-kept cameras (those not in the new list stay if user hasn't removed them)
       setCameras(prev => {
-        // Keep cameras from prev that are NOT in the new list (manually added / disconnected but kept)
         const newIds = new Set(merged.map(c => c.deviceId))
-        const kept = prev.filter(c => !newIds.has(c.deviceId))
+        const kept = prev.filter(c => !newIds.has(c.deviceId) && !hidden.has(c.deviceId))
         return [...merged, ...kept]
       })
 
@@ -229,15 +253,18 @@ export function useCameras(): UseCamerasReturn {
     }
   }, [])
 
-  // Remove a camera from the list entirely
+  // Remove a camera from the list entirely. The deviceId is also persisted to
+  // localStorage so it stays hidden across app restarts — useful for virtual
+  // cameras like OMEN Cam & Voice that ship with the OS but never produce video.
   const removeCamera = useCallback((deviceId: string) => {
+    hiddenIdsRef.current.add(deviceId)
+    saveHiddenCameras(hiddenIdsRef.current)
     setCameras(prev => prev.filter(c => c.deviceId !== deviceId))
     setDisconnectedIds(prev => {
       const next = new Set(prev)
       next.delete(deviceId)
       return next
     })
-    // If it was the active camera, deselect
     if (activeCameraRef.current?.deviceId === deviceId) {
       stopCurrentStream()
       setActiveCamera(null)
@@ -302,6 +329,7 @@ export function useCameras(): UseCamerasReturn {
   const addCamera = useCallback((label: string, deviceId: string) => {
     const trimId = deviceId.trim()
     const trimLabel = label.trim() || `Camera (${trimId.slice(0, 8)})`
+    if (hiddenIdsRef.current.delete(trimId)) saveHiddenCameras(hiddenIdsRef.current)
     setCameras(prev => {
       if (prev.some(c => c.deviceId === trimId)) return prev
       return [...prev, { id: trimId, label: trimLabel, deviceId: trimId }]

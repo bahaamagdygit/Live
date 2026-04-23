@@ -23,6 +23,8 @@ const HEARTBEAT_INTERVAL_MS = 1000
 const HEARTBEAT_MISS_LIMIT  = 3
 const FRAME_FREEZE_MS       = 5000
 
+export type DeviceOrientation = 'portrait' | 'portrait-upside-down' | 'landscape-left' | 'landscape-right'
+
 export interface MobileDevice {
   deviceId: string
   deviceName: string
@@ -40,6 +42,8 @@ export interface MobileDevice {
   }
   // Last JPEG frame arrival (for frozen-frame detection).
   lastFrameAt: number
+  // Phone's current UI orientation; the desktop rotates the feed to match.
+  orientation: DeviceOrientation
 }
 
 interface Session {
@@ -207,6 +211,10 @@ export class MobileBridge {
       switch (msg.type) {
         case 'hello': {
           deviceId = `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+          const initialOrientation: DeviceOrientation =
+            (msg.orientation === 'portrait-upside-down' || msg.orientation === 'landscape-left'
+              || msg.orientation === 'landscape-right' || msg.orientation === 'portrait')
+              ? msg.orientation : 'portrait'
           const device: MobileDevice = {
             deviceId,
             deviceName: typeof msg.name === 'string' && msg.name.trim() ? msg.name.trim() : 'Mobile Camera',
@@ -215,6 +223,7 @@ export class MobileBridge {
             latencyMs:  0,
             capabilities: msg.capabilities && typeof msg.capabilities === 'object' ? msg.capabilities : {},
             lastFrameAt: 0,
+            orientation: initialOrientation,
           }
           const session: Session = {
             ws, videoSocket: null, device,
@@ -257,6 +266,17 @@ export class MobileBridge {
           const s = this.sessions.get(deviceId); if (!s) return
           s.device.capabilities = { ...s.device.capabilities, ...(msg.value || {}) }
           this.notify('mobile-device-updated', { device: s.device })
+          break
+        }
+        case 'orientation': {
+          if (!deviceId) return
+          const s = this.sessions.get(deviceId); if (!s) return
+          const v = msg.value
+          if (v === 'portrait' || v === 'portrait-upside-down' ||
+              v === 'landscape-left' || v === 'landscape-right') {
+            s.device.orientation = v
+            this.notify('mobile-device-updated', { device: s.device })
+          }
           break
         }
         case 'control': {

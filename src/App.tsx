@@ -9,7 +9,6 @@ import { useCameras, DEFAULT_CAM_VIEW, CameraViewSettings } from './hooks/useCam
 import { useIpCameras } from './hooks/useIpCameras'
 import { useWebRTCCameras } from './hooks/useWebRTCCameras'
 import { useMobileCameras, MobileCameraView, DEFAULT_MOBILE_VIEW } from './hooks/useMobileCameras'
-import { MobileFrameView } from './components/MobileFrameView'
 import './components/MobileCameraPanel.css'
 import { useStream } from './hooks/useStream'
 import { useSlides } from './hooks/useSlides'
@@ -106,7 +105,6 @@ function App() {
   const activeMobileMjpegUrl = activeMobileDeviceId
     ? mobileCameras.mjpegUrlFor(activeMobileDeviceId)
     : null
-  const activeMobileFrozen = activeMobileDeviceId ? mobileCameras.frozenIds.has(activeMobileDeviceId) : false
   const { cameras: webrtcCameraList, qrDataUrl: webrtcQrDataUrl, serverUrl: webrtcServerUrl } = useWebRTCCameras()
   const [activeWebRTCDeviceId, setActiveWebRTCDeviceId] = useState<string | null>(null)
   const [webrtcCamViewMap, setWebrtcCamViewMap] = useState<Record<string, CameraViewSettings>>({})
@@ -240,16 +238,16 @@ function App() {
           slides.prevSlide()
           break
         case 'cam-1':
-          if (cameras.cameras[0]) cameras.selectCamera(cameras.cameras[0])
+          if (cameras.cameras[0]) { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cameras.cameras[0]) }
           break
         case 'cam-2':
-          if (cameras.cameras[1]) cameras.selectCamera(cameras.cameras[1])
+          if (cameras.cameras[1]) { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cameras.cameras[1]) }
           break
         case 'cam-3':
-          if (cameras.cameras[2]) cameras.selectCamera(cameras.cameras[2])
+          if (cameras.cameras[2]) { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cameras.cameras[2]) }
           break
         case 'cam-4':
-          if (cameras.cameras[3]) cameras.selectCamera(cameras.cameras[3])
+          if (cameras.cameras[3]) { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cameras.cameras[3]) }
           break
         case 'start-stream':
           handleStartStream()
@@ -714,7 +712,7 @@ function App() {
             cameras={cameras.cameras}
             activeCamera={cameras.activeCamera}
             activeCameraStream={cameras.activeCameraStream}
-            onSelectCamera={cam => { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); cameras.selectCamera(cam) }}
+            onSelectCamera={cam => { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cam) }}
             onRefresh={cameras.refreshCameras}
             onRemoveCamera={cameras.removeCamera}
             onReorderCameras={cameras.reorderCameras}
@@ -731,7 +729,7 @@ function App() {
             onSwitchTransitionChange={setSwitchTransition}
             ipCameras={ipCameras.ipCameras}
             activeIpCamera={activeIpCamera}
-            onSelectIpCamera={cam => { cameras.clearActiveCamera(); setActiveWebRTCDeviceId(null); setActiveIpCameraId(cam.id) }}
+            onSelectIpCamera={cam => { cameras.clearActiveCamera(); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); setActiveIpCameraId(cam.id) }}
             onDisconnectIpCamera={id => { ipCameras.disconnectCamera(id); if (activeIpCameraId === id) setActiveIpCameraId(null) }}
             onReconnectIpCamera={ipCameras.reconnectCamera}
             onSaveAndReconnect={ipCameras.saveAndReconnect}
@@ -739,7 +737,7 @@ function App() {
             onMobileCamMjpegUrl={setMobileCamMjpegUrl}
             webrtcCameras={webrtcCameraList}
             activeWebRTCDeviceId={activeWebRTCDeviceId}
-            onSelectWebRTCCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(null); setActiveWebRTCDeviceId(cam.deviceId) }}
+            onSelectWebRTCCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(null); setActiveMobileDeviceId(null); setActiveWebRTCDeviceId(cam.deviceId) }}
             onDisconnectWebRTCCamera={id => { if (activeWebRTCDeviceId === id) setActiveWebRTCDeviceId(null) }}
             onWebRTCSendCommand={(deviceId, action, value) => {
               // The phone applies the zoom at the camera sensor, so the WebRTC
@@ -772,26 +770,18 @@ function App() {
         </div>
 
         {/* Center: Main Preview */}
-        <div className="app-main__center" style={{ position: 'relative' }}>
-          {activeMobileDeviceId && (
-            <div style={{ position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'auto' }}>
-              <MobileFrameView
-                mjpegUrl={activeMobileMjpegUrl}
-                view={activeMobileView}
-                showFallback={activeMobileFrozen || manualFallback}
-                fallbackBase64={cameraFallback.base64}
-                onFocusTap={pt => {
-                  mobileCameras.sendCommand(activeMobileDeviceId, 'set_focus', pt)
-                }}
-              />
-            </div>
-          )}
+        <div className="app-main__center">
           <MainPreview
-            cameraDeviceId={activeWebRTCDeviceId || activeIpCamera ? '' : (cameras.activeCamera?.deviceId || '')}
-            ipCameraMjpegUrl={activeWebRTCDeviceId ? undefined : activeIpCamera?.mjpegUrl}
+            cameraDeviceId={activeMobileDeviceId || activeWebRTCDeviceId || activeIpCamera ? '' : (cameras.activeCamera?.deviceId || '')}
+            ipCameraMjpegUrl={activeWebRTCDeviceId || activeMobileDeviceId ? undefined : activeIpCamera?.mjpegUrl}
             ipCamView={activeIpCamera?.view}
             webrtcStream={activeWebRTCDeviceId ? (webrtcCameraList.find(c => c.deviceId === activeWebRTCDeviceId)?.stream ?? null) : null}
             webrtcCamView={activeWebRTCDeviceId ? activeWebRTCCamView : undefined}
+            mobileMjpegUrl={activeMobileDeviceId ? activeMobileMjpegUrl : undefined}
+            mobileView={activeMobileDeviceId ? activeMobileView : undefined}
+            mobileOrientation={activeMobileDeviceId
+              ? mobileCameras.devices.find(d => d.deviceId === activeMobileDeviceId)?.orientation
+              : undefined}
             overlaySettings={overlaySettings}
             logoSettings={logoSettings}
             cameraFallback={cameraFallback}

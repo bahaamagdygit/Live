@@ -120,6 +120,10 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragO
   const videoRef = useRef<HTMLVideoElement>(null)
   const [previewError, setPreviewError] = useState(false)
 
+  // Probe the stream for a few seconds and fail the preview if we only ever see
+  // fully-black / near-black frames. This catches virtual cameras (OMEN Cam
+  // & Voice without OMEN Broadcast running, etc.) that open successfully
+  // but never deliver real video.
   useEffect(() => {
     if (isDisconnected) { setPreviewError(true); return }
     if (isActive && activeStream) {
@@ -127,19 +131,54 @@ function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragO
       setPreviewError(false)
       return
     }
+
     let stream: MediaStream | null = null
+    let cancelled = false
+    const probeTimers: ReturnType<typeof setTimeout>[] = []
+
+    const looksDead = (): boolean => {
+      const v = videoRef.current
+      if (!v || v.videoWidth === 0 || v.videoHeight === 0) return true
+      try {
+        const c = document.createElement('canvas')
+        c.width = 16; c.height = 9
+        const ctx = c.getContext('2d'); if (!ctx) return false
+        ctx.drawImage(v, 0, 0, 16, 9)
+        const data = ctx.getImageData(0, 0, 16, 9).data
+        let sum = 0
+        for (let i = 0; i < data.length; i += 4) sum += data[i] + data[i+1] + data[i+2]
+        const avg = sum / ((data.length / 4) * 3)
+        return avg < 3          // effectively all-black
+      } catch { return false }  // can't sample (e.g. tainted) — give benefit of doubt
+    }
+
     const start = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: camera.deviceId ? { deviceId: { ideal: camera.deviceId }, width: 320, height: 180 } : { width: 320, height: 180 },
           audio: false,
         })
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
         if (videoRef.current) videoRef.current.srcObject = stream
         setPreviewError(false)
-      } catch { setPreviewError(true) }
+
+        // Two quick probes at 1.5 s and 3 s; if both look dead, fail the card.
+        probeTimers.push(setTimeout(() => {
+          if (cancelled) return
+          const dead1 = looksDead()
+          probeTimers.push(setTimeout(() => {
+            if (cancelled) return
+            if (dead1 && looksDead()) setPreviewError(true)
+          }, 1500))
+        }, 1500))
+      } catch { if (!cancelled) setPreviewError(true) }
     }
     start()
-    return () => { stream?.getTracks().forEach(t => t.stop()) }
+    return () => {
+      cancelled = true
+      probeTimers.forEach(clearTimeout)
+      stream?.getTracks().forEach(t => t.stop())
+    }
   }, [camera.deviceId, isDisconnected, isActive, activeStream])
 
   return (
