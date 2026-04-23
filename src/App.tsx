@@ -9,7 +9,6 @@ import { useCameras, DEFAULT_CAM_VIEW, CameraViewSettings } from './hooks/useCam
 import { useIpCameras } from './hooks/useIpCameras'
 import { useWebRTCCameras } from './hooks/useWebRTCCameras'
 import { useMobileCameras, MobileCameraView, DEFAULT_MOBILE_VIEW } from './hooks/useMobileCameras'
-import { MobileCameraPanel } from './components/MobileCameraPanel'
 import { MobileFrameView } from './components/MobileFrameView'
 import './components/MobileCameraPanel.css'
 import { useStream } from './hooks/useStream'
@@ -122,7 +121,14 @@ function App() {
   const [mobileCamMjpegUrl, setMobileCamMjpegUrl] = useState<string | null>(null)
   // Active IP camera — also handles the virtual '__mobile__' entry
   const activeIpCamera = activeIpCameraId === '__mobile__' && mobileCamMjpegUrl
-    ? { id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true, mjpegUrl: mobileCamMjpegUrl, view: { scale: 100, offsetX: 0, offsetY: 0, fit: 'cover' as const, brightness: 100, contrast: 100, saturation: 100, flipH: false, flipV: false } }
+    ? {
+        id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true,
+        mjpegUrl: mobileCamMjpegUrl,
+        preset: { id: '__mobile__', label: 'Mobile Camera', host: '127.0.0.1', port: '18800',
+                  user: '', pass: '', channel: '1', subStream: false, brand: 'generic' as const },
+        view: { scale: 100, offsetX: 0, offsetY: 0, fit: 'cover' as const,
+                brightness: 100, contrast: 100, saturation: 100, flipH: false, flipV: false },
+      }
     : ipCameras.ipCameras.find(c => c.id === activeIpCameraId) ?? null
   const stream = useStream()
   const slides = useSlides()
@@ -702,29 +708,8 @@ function App() {
 
       {/* Main content area */}
       <main className="app-main">
-        {/* Left: Camera Panel + Mobile Bridge panel */}
+        {/* Left: Camera Panel — USB, IP, and mobile phones share the same grid */}
         <div className="app-main__left">
-          {mobileCameras.connection && (
-            <MobileCameraPanel
-              devices={mobileCameras.devices}
-              qrDataUrl={mobileCameras.connection.qrDataUrl}
-              serverUrl={mobileCameras.connection.url}
-              serverIp={mobileCameras.connection.ip}
-              controlPort={mobileCameras.connection.controlPort}
-              activeDeviceId={activeMobileDeviceId}
-              frozenIds={mobileCameras.frozenIds}
-              views={mobileCameras.views}
-              onSelectDevice={id => {
-                cameras.clearActiveCamera()
-                setActiveIpCameraId(null)
-                setActiveWebRTCDeviceId(null)
-                setActiveMobileDeviceId(id)
-              }}
-              onSendCommand={mobileCameras.sendCommand}
-              onUpdateView={mobileCameras.updateView}
-              onApplyPreset={mobileCameras.applyPreset}
-            />
-          )}
           <CameraPanel
             cameras={cameras.cameras}
             activeCamera={cameras.activeCamera}
@@ -766,6 +751,23 @@ function App() {
             onWebRTCCamViewChange={setWebrtcCamView}
             webrtcQrDataUrl={webrtcQrDataUrl}
             webrtcServerUrl={webrtcServerUrl}
+            mobileBridgeDevices={mobileCameras.devices}
+            activeMobileBridgeDeviceId={activeMobileDeviceId}
+            mobileBridgeFrozenIds={mobileCameras.frozenIds}
+            mobileBridgeViews={mobileCameras.views}
+            mobileBridgeMjpegUrlFor={mobileCameras.mjpegUrlFor}
+            mobileBridgePairingQrUrl={mobileCameras.connection?.qrDataUrl}
+            mobileBridgePairingIp={mobileCameras.connection?.ip}
+            mobileBridgePairingControlPort={mobileCameras.connection?.controlPort}
+            onSelectMobileBridgeDevice={id => {
+              cameras.clearActiveCamera()
+              setActiveIpCameraId(null)
+              setActiveWebRTCDeviceId(null)
+              setActiveMobileDeviceId(id)
+            }}
+            onMobileBridgeSendCommand={mobileCameras.sendCommand}
+            onMobileBridgeUpdateView={mobileCameras.updateView}
+            onMobileBridgeApplyPreset={mobileCameras.applyPreset}
           />
         </div>
 

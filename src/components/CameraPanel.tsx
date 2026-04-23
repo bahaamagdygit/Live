@@ -4,6 +4,9 @@ import { CameraViewSettings, DEFAULT_CAM_VIEW } from '../hooks/useCameras'
 import { IpCamera } from '../hooks/useIpCameras'
 import { CameraSwitchTransition } from './MainPreview'
 import { WebRTCCamera } from '../hooks/useWebRTCCameras'
+import { MobileBridgeDevice } from '../types/electron'
+import { MobileCameraView, FilterPresetId } from '../hooks/useMobileCameras'
+import { MobileBridgeSettingsModal } from './MobileBridgeSettingsModal'
 
 interface CameraPanelProps {
   cameras: Camera[]
@@ -45,6 +48,61 @@ interface CameraPanelProps {
   onWebRTCCamViewChange?: (deviceId: string, patch: Partial<CameraViewSettings>) => void
   webrtcQrDataUrl?: string
   webrtcServerUrl?: string
+  // ── Mobile-bridge (new LAN architecture) ───────────────────────────────
+  mobileBridgeDevices?: MobileBridgeDevice[]
+  activeMobileBridgeDeviceId?: string | null
+  mobileBridgeFrozenIds?: Set<string>
+  mobileBridgeViews?: Record<string, MobileCameraView>
+  mobileBridgeMjpegUrlFor?: (deviceId: string) => string
+  mobileBridgePairingQrUrl?: string
+  mobileBridgePairingIp?: string
+  mobileBridgePairingControlPort?: number
+  onSelectMobileBridgeDevice?: (deviceId: string) => void
+  onMobileBridgeSendCommand?: (deviceId: string, action: string, value?: unknown) => void
+  onMobileBridgeUpdateView?:  (deviceId: string, patch: Partial<MobileCameraView>) => void
+  onMobileBridgeApplyPreset?: (deviceId: string, preset: FilterPresetId) => void
+}
+
+function qualityColor(latencyMs: number): string {
+  if (latencyMs < 50)  return '#22c55e'
+  if (latencyMs < 150) return '#f59e0b'
+  return '#ef4444'
+}
+
+function MobileBridgeCard({ device, isActive, isFrozen, mjpegUrl, onSelect, onOpenSettings }: {
+  device: MobileBridgeDevice
+  isActive: boolean
+  isFrozen: boolean
+  mjpegUrl: string
+  onSelect: () => void
+  onOpenSettings: (e: React.MouseEvent) => void
+}) {
+  return (
+    <div
+      className={`mb-card ${isActive ? 'mb-card--active' : ''} ${isFrozen ? 'mb-card--frozen' : ''}`}
+      onClick={onSelect}
+      title={device.deviceName}
+    >
+      <div className="mb-card__preview">
+        {isFrozen
+          ? <span className="mb-card__empty">⚠</span>
+          : <img className="mb-card__mjpeg" src={mjpegUrl} alt="" />}
+        {isActive  && <div className="mb-card__live-badge">LIVE</div>}
+        {isFrozen  && <div className="mb-card__frozen-badge">FROZEN</div>}
+      </div>
+      <div className="mb-card__info">
+        <span className="mb-card__dot" style={{ background: qualityColor(device.latencyMs) }} />
+        <span className="mb-card__label">📱 {device.deviceName}</span>
+        <span className="mb-card__latency">{Math.round(device.latencyMs)} ms</span>
+        <button
+          type="button"
+          className="mb-card__action"
+          title="Camera settings"
+          onClick={onOpenSettings}
+        >⚙</button>
+      </div>
+    </div>
+  )
 }
 
 function CameraPreview({ camera, isActive, isDisconnected, activeStream, isDragOver, onClick, onRemove, onDragStart, onDragOver, onDrop }: {
@@ -250,7 +308,17 @@ export function CameraPanel({
   webrtcCameras = [], activeWebRTCDeviceId, onSelectWebRTCCamera, onDisconnectWebRTCCamera,
   onWebRTCSendCommand, webrtcCamViewMap, onWebRTCCamViewChange,
   webrtcQrDataUrl, webrtcServerUrl,
+  mobileBridgeDevices = [], activeMobileBridgeDeviceId,
+  mobileBridgeFrozenIds, mobileBridgeViews, mobileBridgeMjpegUrlFor,
+  mobileBridgePairingQrUrl, mobileBridgePairingIp, mobileBridgePairingControlPort,
+  onSelectMobileBridgeDevice, onMobileBridgeSendCommand, onMobileBridgeUpdateView, onMobileBridgeApplyPreset,
 }: CameraPanelProps) {
+  // Mobile-bridge settings popup — tracks which phone (if any) is open.
+  const [mbSettingsId, setMbSettingsId] = useState<string | null>(null)
+  const mbSettingsDevice = mbSettingsId
+    ? mobileBridgeDevices.find(d => d.deviceId === mbSettingsId) ?? null
+    : null
+  const mbSettingsView = mbSettingsId && mobileBridgeViews ? (mobileBridgeViews[mbSettingsId] ?? null) : null
   const [showSettings, setShowSettings] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [addLabel, setAddLabel] = useState('')
@@ -415,34 +483,24 @@ export function CameraPanel({
       <div className="panel__content">
         {error && <div className="alert alert--error"><span>⚠️</span> {error}</div>}
 
-        {/* ── Add Mobile Phone Camera (WebRTC/WS) ── */}
-        {showWebRTCModal && webrtcQrDataUrl && (
-          <div className="mobile-qr-card">
-            <div className="mobile-qr-card__header">
-              <span>📱 Add Mobile Phone Camera</span>
-              <button type="button" className="mobile-qr-card__close" onClick={() => setShowWebRTCModal(false)}>✕</button>
+        {/* ── Pair Mobile Phone (new LAN bridge) ── */}
+        {showWebRTCModal && mobileBridgePairingQrUrl && (
+          <div className="mb-pair-card">
+            <div className="mb-pair-card__qr-wrap">
+              <img src={mobileBridgePairingQrUrl} className="mb-pair-card__qr" alt="Pair QR" />
             </div>
-            <p className="mobile-qr-card__hint">Scan with Church Cam app on your phone</p>
-            <img src={webrtcQrDataUrl} className="mobile-qr-card__qr" alt="QR Code" />
-            <div className="mobile-qr-card__url" title={webrtcServerUrl ?? ''}>{webrtcServerUrl}</div>
-          </div>
-        )}
-
-        {/* ── WebRTC Phone Cameras (unlimited) ── */}
-        {webrtcCameras.length > 0 && (
-          <div className="camera-list">
-            {webrtcCameras.map(cam => (
-              <WebRTCCameraCard
-                key={cam.deviceId}
-                cam={cam}
-                isActive={activeWebRTCDeviceId === cam.deviceId}
-                onSelect={() => onSelectWebRTCCamera?.(cam)}
-                onDisconnect={e => { e.stopPropagation(); onDisconnectWebRTCCamera?.(cam.deviceId) }}
-                onSendCommand={(action, value) => onWebRTCSendCommand?.(cam.deviceId, action, value)}
-                camView={webrtcCamViewMap?.[cam.deviceId] ?? DEFAULT_CAM_VIEW}
-                onCamViewChange={patch => onWebRTCCamViewChange?.(cam.deviceId, patch)}
-              />
-            ))}
+            <div className="mb-pair-card__info">
+              <div className="mb-pair-card__title">
+                <span>📱 Pair a phone</span>
+              </div>
+              <div className="mb-pair-card__ip">
+                Scan with Church Cam — or enter <code>{mobileBridgePairingIp}:{mobileBridgePairingControlPort}</code>
+              </div>
+              <div className="mb-pair-card__hint">
+                Phone and PC must be on the same WiFi. Internet is not required.
+              </div>
+            </div>
+            <button type="button" className="mb-pair-card__close" onClick={() => setShowWebRTCModal(false)} title="Close">✕</button>
           </div>
         )}
         {!error && cameras.length === 0 && !isLoading && (
@@ -488,6 +546,18 @@ export function CameraPanel({
           onDragLeave={() => setDragOverIdx(null)}
           onDragEnd={() => { setDragFromIdx(null); setDragOverIdx(null) }}
         >
+          {/* Mobile-bridge phones — shown as cards alongside USB cameras. */}
+          {mobileBridgeDevices.map(device => (
+            <MobileBridgeCard
+              key={device.deviceId}
+              device={device}
+              isActive={activeMobileBridgeDeviceId === device.deviceId}
+              isFrozen={mobileBridgeFrozenIds?.has(device.deviceId) ?? false}
+              mjpegUrl={mobileBridgeMjpegUrlFor ? mobileBridgeMjpegUrlFor(device.deviceId) : ''}
+              onSelect={() => onSelectMobileBridgeDevice?.(device.deviceId)}
+              onOpenSettings={e => { e.stopPropagation(); setMbSettingsId(device.deviceId) }}
+            />
+          ))}
           {cameras.map((camera, idx) => (
             <CameraPreview
               key={camera.id}
@@ -504,6 +574,18 @@ export function CameraPanel({
             />
           ))}
         </div>
+
+        {/* Mobile-bridge settings popup */}
+        {mbSettingsDevice && mbSettingsView && (
+          <MobileBridgeSettingsModal
+            device={mbSettingsDevice}
+            view={mbSettingsView}
+            onClose={() => setMbSettingsId(null)}
+            onSendCommand={(action, value) => onMobileBridgeSendCommand?.(mbSettingsDevice.deviceId, action, value)}
+            onUpdateView={patch => onMobileBridgeUpdateView?.(mbSettingsDevice.deviceId, patch)}
+            onApplyPreset={preset => onMobileBridgeApplyPreset?.(mbSettingsDevice.deviceId, preset)}
+          />
+        )}
 
         {/* ── Add IP Camera Form ── */}
         {showIpForm && (
