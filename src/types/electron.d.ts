@@ -87,6 +87,41 @@ interface ElectronAPI {
   onWebRTCDeviceJoined?: (cb: (data: { deviceId: string; deviceName: string }) => void) => () => void
   onWebRTCDeviceDisconnected?: (cb: (data: { deviceId: string }) => void) => () => void
   onWebRTCSignal?: (cb: (data: any) => void) => () => void
+  // ── Mobile Bridge (new architecture) ───────────────────────────────────────
+  mbStart?: () => Promise<{
+    success: boolean; url: string; ip: string; qrDataUrl: string
+    controlPort: number; videoPort: number; mjpegPort: number
+    devices: MobileBridgeDevice[]
+  }>
+  mbStop?: () => Promise<{ success: boolean }>
+  mbListDevices?: () => Promise<{ success: boolean; devices: MobileBridgeDevice[] }>
+  mbSendCommand?: (deviceId: string, action: string, value?: unknown) => void
+  mbBroadcastReading?: (text: string, langs?: string[]) => void
+  mbBroadcastFilter?: (deviceId: string, value: Record<string, unknown>) => void
+  mbBroadcastDesktopState?: (value: Record<string, unknown>) => void
+  onMobileDeviceJoined?: (cb: (d: { device: MobileBridgeDevice }) => void) => () => void
+  onMobileDeviceUpdated?: (cb: (d: { device: MobileBridgeDevice }) => void) => () => void
+  onMobileDeviceDisconnected?: (cb: (d: { deviceId: string; reason: string }) => void) => () => void
+  onMobileFrameFrozen?: (cb: (d: { deviceId: string }) => void) => () => void
+  onMobileControl?: (cb: (d: { deviceId: string; action: string; value?: unknown }) => void) => () => void
+  onMobileRequestState?: (cb: (d: { deviceId: string }) => void) => () => void
+}
+
+export interface MobileBridgeDevice {
+  deviceId: string
+  deviceName: string
+  connectedAt: number
+  lastPong: number
+  latencyMs: number
+  lastFrameAt: number
+  capabilities: {
+    zoom?:     { min: number; max: number; step: number; neutral: number }
+    exposure?: { min: number; max: number; step: number }
+    whiteBalanceModes?: string[]
+    torchSupported?: boolean
+    resolutions?: Array<{ width: number; height: number; fps: number[] }>
+    cameras?: Array<{ id: string; label: string; position: 'front' | 'back' }>
+  }
 }
 
 declare global {
