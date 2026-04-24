@@ -100,14 +100,11 @@ const MobileCanvasFeed = memo(function MobileCanvasFeed({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Portrait-angle canvases are 9:16, landscape are 16:9 (Problem 4).
-    const portraitCanvas = angle === 0 || angle === 180
-    const targetW = portraitCanvas ? 1080 : 1920
-    const targetH = portraitCanvas ? 1920 : 1080
-    if (canvas.width !== targetW)   canvas.width  = targetW
-    if (canvas.height !== targetH)  canvas.height = targetH
-
-    const rotate = (angle === 180 || angle === 270) ? 180 : 0   // Problem 3
+    // Canvas always matches the 16:9 presentation stage so the feed fills it
+    // at full resolution (never appears tiny). Portrait frames are center-
+    // cropped via `cover` fitting so the phone operator's subject stays large.
+    canvas.width  = 1920
+    canvas.height = 1080
 
     const draw = () => {
       rafRef.current = requestAnimationFrame(draw)
@@ -119,19 +116,17 @@ const MobileCanvasFeed = memo(function MobileCanvasFeed({
       ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.translate(canvas.width / 2, canvas.height / 2)
-      if (rotate)       ctx.rotate((rotate * Math.PI) / 180)  // Problem 6: rotate first
-      if (facingFront)  ctx.scale(-1, 1)                      // Problem 6: then mirror
-      if (view)         ctx.filter = filtersToCss(view.filters)
+      if (facingFront) ctx.scale(-1, 1)
+      if (view)        ctx.filter = filtersToCss(view.filters)
 
-      // Fit the frame into the canvas preserving aspect (Problem 4). After
-      // rotation the usable area is either the canvas itself (0°) or still
-      // the canvas itself (180°) — both have the same w×h. 90/270 rotation
-      // isn't used on the desktop per the spec.
+      // Cover (fill) scaling: the frame always fills the canvas; overflow is
+      // cropped. For a portrait phone feed this trims the top/bottom so the
+      // centre of the image is shown large instead of shrunk with black bars.
       const canvasAR = canvas.width / canvas.height
       const imgAR    = iw / ih
-      let dw = canvas.width, dh = canvas.height
-      if (imgAR > canvasAR) dh = canvas.width / imgAR
-      else                  dw = canvas.height * imgAR
+      let dw: number, dh: number
+      if (imgAR > canvasAR) { dh = canvas.height; dw = dh * imgAR }
+      else                  { dw = canvas.width;  dh = dw / imgAR }
 
       const zoom    = Math.max(1, view?.zoom ?? 1)
       const offsetX = ((view?.offsetX ?? 0) / 100) * (canvas.width  / 2)
@@ -146,34 +141,25 @@ const MobileCanvasFeed = memo(function MobileCanvasFeed({
     }
     rafRef.current = requestAnimationFrame(draw)
     return () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current) }
+    // angle is kept as a dep so the effect re-runs if the phone rotates;
+    // canvas dimensions themselves don't depend on it anymore.
   }, [angle, facingFront, view])
 
-  // Fit-to-container sizing. The canvas always renders at its intrinsic
-  // 16:9 / 9:16 buffer resolution; CSS `object-fit: contain` behavior is
-  // achieved by letting `max-height/width` clamp it into the flex parent.
-  // The 300ms `aspect-ratio` transition (Problem 5) animates the shape change
-  // without ever pausing the stream.
-  const displayPortrait = angle === 0 || angle === 180
+  // Canvas always fills the full 16:9 presentation stage. The "cover" draw
+  // inside the rAF loop ensures portrait frames show up large (center-crop)
+  // instead of small-with-pillarbox. 300 ms CSS transition kept on opacity in
+  // case we later want to fade the layer.
   return (
     <div
       className="mobile-stage"
       style={{
         position: 'absolute', inset: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: '#000', overflow: 'hidden',
       }}
     >
       <canvas
         ref={canvasRef}
-        style={{
-          display: 'block',
-          width:  displayPortrait ? 'auto'   : '100%',
-          height: displayPortrait ? '100%'   : 'auto',
-          maxWidth:  '100%',
-          maxHeight: '100%',
-          aspectRatio: displayPortrait ? '9 / 16' : '16 / 9',
-          transition: 'aspect-ratio 300ms ease, width 300ms ease, height 300ms ease',
-        }}
+        style={{ width: '100%', height: '100%', display: 'block' }}
       />
     </div>
   )
