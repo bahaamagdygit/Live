@@ -24,6 +24,7 @@ const HEARTBEAT_MISS_LIMIT  = 3
 const FRAME_FREEZE_MS       = 5000
 
 export type DeviceOrientation = 'portrait' | 'portrait-upside-down' | 'landscape-left' | 'landscape-right'
+export type OrientationAngle  = 0 | 90 | 180 | 270
 
 export interface MobileDevice {
   deviceId: string
@@ -44,6 +45,8 @@ export interface MobileDevice {
   lastFrameAt: number
   // Phone's current UI orientation; the desktop rotates the feed to match.
   orientation: DeviceOrientation
+  // 0 / 90 / 180 / 270 — drives canvas-context rotation on the desktop.
+  orientationAngle: OrientationAngle
 }
 
 interface Session {
@@ -211,10 +214,18 @@ export class MobileBridge {
       switch (msg.type) {
         case 'hello': {
           deviceId = `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+          // Problem 7: accept the current phone angle from the reconnect
+          // handshake so the desktop restores orientation BEFORE any frame
+          // arrives.
+          const angleFromHello: OrientationAngle =
+            (msg.orientationAngle === 0 || msg.orientationAngle === 90 ||
+             msg.orientationAngle === 180 || msg.orientationAngle === 270)
+              ? msg.orientationAngle : 0
           const initialOrientation: DeviceOrientation =
-            (msg.orientation === 'portrait-upside-down' || msg.orientation === 'landscape-left'
-              || msg.orientation === 'landscape-right' || msg.orientation === 'portrait')
-              ? msg.orientation : 'portrait'
+            angleFromHello === 0   ? 'portrait' :
+            angleFromHello === 90  ? 'landscape-right' :
+            angleFromHello === 180 ? 'portrait-upside-down' :
+                                     'landscape-left'
           const device: MobileDevice = {
             deviceId,
             deviceName: typeof msg.name === 'string' && msg.name.trim() ? msg.name.trim() : 'Mobile Camera',
@@ -224,6 +235,7 @@ export class MobileBridge {
             capabilities: msg.capabilities && typeof msg.capabilities === 'object' ? msg.capabilities : {},
             lastFrameAt: 0,
             orientation: initialOrientation,
+            orientationAngle: angleFromHello,
           }
           const session: Session = {
             ws, videoSocket: null, device,
@@ -275,6 +287,24 @@ export class MobileBridge {
           if (v === 'portrait' || v === 'portrait-upside-down' ||
               v === 'landscape-left' || v === 'landscape-right') {
             s.device.orientation = v
+            this.notify('mobile-device-updated', { device: s.device })
+          }
+          break
+        }
+        case 'orientation_change': {
+          // Problem 1 — canonical wire message: { type:"orientation_change", angle:0|90|180|270 }
+          // Arrives BEFORE the next frame, so the canvas renderer always
+          // rotates using an up-to-date angle.
+          if (!deviceId) return
+          const s = this.sessions.get(deviceId); if (!s) return
+          const a = msg.angle
+          if (a === 0 || a === 90 || a === 180 || a === 270) {
+            s.device.orientationAngle = a
+            s.device.orientation =
+              a === 0   ? 'portrait' :
+              a === 90  ? 'landscape-right' :
+              a === 180 ? 'portrait-upside-down' :
+                          'landscape-left'
             this.notify('mobile-device-updated', { device: s.device })
           }
           break

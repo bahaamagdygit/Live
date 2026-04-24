@@ -779,9 +779,10 @@ function App() {
             webrtcCamView={activeWebRTCDeviceId ? activeWebRTCCamView : undefined}
             mobileMjpegUrl={activeMobileDeviceId ? activeMobileMjpegUrl : undefined}
             mobileView={activeMobileDeviceId ? activeMobileView : undefined}
-            mobileOrientation={activeMobileDeviceId
-              ? mobileCameras.devices.find(d => d.deviceId === activeMobileDeviceId)?.orientation
-              : undefined}
+            mobileOrientationAngle={activeMobileDeviceId
+              ? mobileCameras.devices.find(d => d.deviceId === activeMobileDeviceId)?.orientationAngle ?? 0
+              : 0}
+            mobileFacingFront={activeMobileView?.facing === 'front'}
             overlaySettings={overlaySettings}
             logoSettings={logoSettings}
             cameraFallback={cameraFallback}

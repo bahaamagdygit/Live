@@ -109,6 +109,7 @@ interface ElectronAPI {
 
 export type MobileDeviceOrientation =
   | 'portrait' | 'portrait-upside-down' | 'landscape-left' | 'landscape-right'
+export type MobileOrientationAngle = 0 | 90 | 180 | 270
 
 export interface MobileBridgeDevice {
   deviceId: string
@@ -118,6 +119,7 @@ export interface MobileBridgeDevice {
   latencyMs: number
   lastFrameAt: number
   orientation: MobileDeviceOrientation
+  orientationAngle: MobileOrientationAngle
   capabilities: {
     zoom?:     { min: number; max: number; step: number; neutral: number }
     exposure?: { min: number; max: number; step: number }
