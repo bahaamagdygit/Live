@@ -8,6 +8,8 @@ import { VideoOverlayWidget } from './components/VideoOverlayWidget'
 import { useCameras, DEFAULT_CAM_VIEW, CameraViewSettings } from './hooks/useCameras'
 import { useIpCameras } from './hooks/useIpCameras'
 import { useWebRTCCameras } from './hooks/useWebRTCCameras'
+import { useMobileCameras, MobileCameraView, DEFAULT_MOBILE_VIEW } from './hooks/useMobileCameras'
+import './components/MobileCameraPanel.css'
 import { useStream } from './hooks/useStream'
 import { useSlides } from './hooks/useSlides'
 import { AppSettings, OverlaySettings, LogoSettings, CameraFallbackSettings, VideoOverlaySettings } from './types'
@@ -95,6 +97,14 @@ function App() {
 
   const cameras = useCameras()
   const ipCameras = useIpCameras()
+  const mobileCameras = useMobileCameras()
+  const [activeMobileDeviceId, setActiveMobileDeviceId] = useState<string | null>(null)
+  const activeMobileView: MobileCameraView = activeMobileDeviceId
+    ? (mobileCameras.views[activeMobileDeviceId] ?? DEFAULT_MOBILE_VIEW)
+    : DEFAULT_MOBILE_VIEW
+  const activeMobileMjpegUrl = activeMobileDeviceId
+    ? mobileCameras.mjpegUrlFor(activeMobileDeviceId)
+    : null
   const { cameras: webrtcCameraList, qrDataUrl: webrtcQrDataUrl, serverUrl: webrtcServerUrl } = useWebRTCCameras()
   const [activeWebRTCDeviceId, setActiveWebRTCDeviceId] = useState<string | null>(null)
   const [webrtcCamViewMap, setWebrtcCamViewMap] = useState<Record<string, CameraViewSettings>>({})
@@ -109,7 +119,14 @@ function App() {
   const [mobileCamMjpegUrl, setMobileCamMjpegUrl] = useState<string | null>(null)
   // Active IP camera — also handles the virtual '__mobile__' entry
   const activeIpCamera = activeIpCameraId === '__mobile__' && mobileCamMjpegUrl
-    ? { id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true, mjpegUrl: mobileCamMjpegUrl, view: { scale: 100, offsetX: 0, offsetY: 0, fit: 'cover' as const, brightness: 100, contrast: 100, saturation: 100, flipH: false, flipV: false } }
+    ? {
+        id: '__mobile__', label: 'Mobile Camera', rtspUrl: '', port: 18800, active: true,
+        mjpegUrl: mobileCamMjpegUrl,
+        preset: { id: '__mobile__', label: 'Mobile Camera', host: '127.0.0.1', port: '18800',
+                  user: '', pass: '', channel: '1', subStream: false, brand: 'generic' as const },
+        view: { scale: 100, offsetX: 0, offsetY: 0, fit: 'cover' as const,
+                brightness: 100, contrast: 100, saturation: 100, flipH: false, flipV: false },
+      }
     : ipCameras.ipCameras.find(c => c.id === activeIpCameraId) ?? null
   const stream = useStream()
   const slides = useSlides()
@@ -221,16 +238,16 @@ function App() {
           slides.prevSlide()
           break
         case 'cam-1':
-          if (cameras.cameras[0]) cameras.selectCamera(cameras.cameras[0])
+          if (cameras.cameras[0]) { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cameras.cameras[0]) }
           break
         case 'cam-2':
-          if (cameras.cameras[1]) cameras.selectCamera(cameras.cameras[1])
+          if (cameras.cameras[1]) { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cameras.cameras[1]) }
           break
         case 'cam-3':
-          if (cameras.cameras[2]) cameras.selectCamera(cameras.cameras[2])
+          if (cameras.cameras[2]) { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cameras.cameras[2]) }
           break
         case 'cam-4':
-          if (cameras.cameras[3]) cameras.selectCamera(cameras.cameras[3])
+          if (cameras.cameras[3]) { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cameras.cameras[3]) }
           break
         case 'start-stream':
           handleStartStream()
@@ -306,6 +323,81 @@ function App() {
       return { ...prev, text, langs }
     })
   }, [slides.currentSlide]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Broadcast the current overlay reading text to all paired mobile devices
+  // so their reading overlay stays in sync with the desktop output.
+  useEffect(() => {
+    if (!window.electronAPI?.mbBroadcastReading) return
+    const text = overlaySettings.visible ? (overlaySettings.text || '') : ''
+    window.electronAPI.mbBroadcastReading(text, overlaySettings.langs || [])
+  }, [overlaySettings.text, overlaySettings.visible, overlaySettings.langs])
+
+  // Broadcast core desktop state (current slide, stream status) to phones —
+  // lets the mobile Control screen render accurate indicators.
+  useEffect(() => {
+    if (!window.electronAPI?.mbBroadcastDesktopState) return
+    window.electronAPI.mbBroadcastDesktopState({
+      slideIndex: slides.currentSlideIndex,
+      totalSlides: slides.slides.length,
+      currentText: slides.getCurrentText(),
+      streamStatus: stream.streamStatus,
+      recordingStatus: stream.recordingStatus,
+      textVisible: overlaySettings.visible,
+      activeCameraLabel: activeMobileDeviceId ? 'Mobile' :
+        (activeIpCameraId ? (activeIpCamera?.label || 'IP Camera') : (cameras.activeCamera?.label || 'None')),
+      availableCameras: [
+        ...cameras.cameras.map(c => ({ id: `usb:${c.deviceId}`, label: c.label, kind: 'usb' })),
+        ...ipCameras.ipCameras.map(c => ({ id: `ip:${c.id}`, label: c.label, kind: 'ip' })),
+      ],
+    })
+  }, [slides.currentSlideIndex, slides.slides.length, stream.streamStatus, stream.recordingStatus,
+      overlaySettings.visible, activeMobileDeviceId, activeIpCameraId, cameras.activeCamera,
+      cameras.cameras, ipCameras.ipCameras]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reverse control: commands from mobile → act on desktop state.
+  useEffect(() => {
+    if (!window.electronAPI?.onMobileControl) return
+    return window.electronAPI.onMobileControl(({ action, value }) => {
+      switch (action) {
+        case 'select_camera': {
+          const id = String(value ?? '')
+          if (id.startsWith('usb:')) {
+            const deviceId = id.slice(4)
+            const cam = cameras.cameras.find(c => c.deviceId === deviceId)
+            if (cam) {
+              setActiveIpCameraId(null); setActiveMobileDeviceId(null)
+              cameras.selectCamera(cam)
+            }
+          } else if (id.startsWith('ip:')) {
+            cameras.clearActiveCamera(); setActiveMobileDeviceId(null)
+            setActiveIpCameraId(id.slice(3))
+          }
+          break
+        }
+        case 'set_zoom': {
+          const z = Number(value)
+          if (!Number.isFinite(z)) break
+          cameras.setCamView({ zoom: z })
+          break
+        }
+        case 'toggle_text': {
+          setOverlaySettings(prev => ({ ...prev, visible: typeof value === 'boolean' ? value : !prev.visible }))
+          break
+        }
+        case 'next_slide': slides.nextSlide(); break
+        case 'prev_slide': slides.prevSlide(); break
+        case 'start_stream':
+          stream.startStream({ ...settings.streamConfig, cameraName: cameras.activeCamera?.label || '' })
+          break
+        case 'stop_stream':     stream.stopStream(); break
+        case 'start_recording':
+          stream.startRecording({ ...settings.streamConfig, cameraName: cameras.activeCamera?.label || '' })
+          break
+        case 'stop_recording':  stream.stopRecording(); break
+        case 'cut_to_black':    setManualFallback(v => typeof value === 'boolean' ? value : !v); break
+      }
+    })
+  }, [cameras, slides, stream, settings.streamConfig])
 
   // Listen for presentation window being closed externally
   useEffect(() => {
@@ -614,13 +706,13 @@ function App() {
 
       {/* Main content area */}
       <main className="app-main">
-        {/* Left: Camera Panel only */}
+        {/* Left: Camera Panel — USB, IP, and mobile phones share the same grid */}
         <div className="app-main__left">
           <CameraPanel
             cameras={cameras.cameras}
             activeCamera={cameras.activeCamera}
             activeCameraStream={cameras.activeCameraStream}
-            onSelectCamera={cam => { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); cameras.selectCamera(cam) }}
+            onSelectCamera={cam => { setActiveIpCameraId(null); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); cameras.selectCamera(cam) }}
             onRefresh={cameras.refreshCameras}
             onRemoveCamera={cameras.removeCamera}
             onReorderCameras={cameras.reorderCameras}
@@ -637,7 +729,7 @@ function App() {
             onSwitchTransitionChange={setSwitchTransition}
             ipCameras={ipCameras.ipCameras}
             activeIpCamera={activeIpCamera}
-            onSelectIpCamera={cam => { cameras.clearActiveCamera(); setActiveWebRTCDeviceId(null); setActiveIpCameraId(cam.id) }}
+            onSelectIpCamera={cam => { cameras.clearActiveCamera(); setActiveWebRTCDeviceId(null); setActiveMobileDeviceId(null); setActiveIpCameraId(cam.id) }}
             onDisconnectIpCamera={id => { ipCameras.disconnectCamera(id); if (activeIpCameraId === id) setActiveIpCameraId(null) }}
             onReconnectIpCamera={ipCameras.reconnectCamera}
             onSaveAndReconnect={ipCameras.saveAndReconnect}
@@ -645,7 +737,7 @@ function App() {
             onMobileCamMjpegUrl={setMobileCamMjpegUrl}
             webrtcCameras={webrtcCameraList}
             activeWebRTCDeviceId={activeWebRTCDeviceId}
-            onSelectWebRTCCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(null); setActiveWebRTCDeviceId(cam.deviceId) }}
+            onSelectWebRTCCamera={cam => { cameras.clearActiveCamera(); setActiveIpCameraId(null); setActiveMobileDeviceId(null); setActiveWebRTCDeviceId(cam.deviceId) }}
             onDisconnectWebRTCCamera={id => { if (activeWebRTCDeviceId === id) setActiveWebRTCDeviceId(null) }}
             onWebRTCSendCommand={(deviceId, action, value) => {
               // The phone applies the zoom at the camera sensor, so the WebRTC
@@ -657,17 +749,40 @@ function App() {
             onWebRTCCamViewChange={setWebrtcCamView}
             webrtcQrDataUrl={webrtcQrDataUrl}
             webrtcServerUrl={webrtcServerUrl}
+            mobileBridgeDevices={mobileCameras.devices}
+            activeMobileBridgeDeviceId={activeMobileDeviceId}
+            mobileBridgeFrozenIds={mobileCameras.frozenIds}
+            mobileBridgeViews={mobileCameras.views}
+            mobileBridgeMjpegUrlFor={mobileCameras.mjpegUrlFor}
+            mobileBridgePairingQrUrl={mobileCameras.connection?.qrDataUrl}
+            mobileBridgePairingIp={mobileCameras.connection?.ip}
+            mobileBridgePairingControlPort={mobileCameras.connection?.controlPort}
+            onSelectMobileBridgeDevice={id => {
+              cameras.clearActiveCamera()
+              setActiveIpCameraId(null)
+              setActiveWebRTCDeviceId(null)
+              setActiveMobileDeviceId(id)
+            }}
+            onMobileBridgeSendCommand={mobileCameras.sendCommand}
+            onMobileBridgeUpdateView={mobileCameras.updateView}
+            onMobileBridgeApplyPreset={mobileCameras.applyPreset}
           />
         </div>
 
         {/* Center: Main Preview */}
         <div className="app-main__center">
           <MainPreview
-            cameraDeviceId={activeWebRTCDeviceId || activeIpCamera ? '' : (cameras.activeCamera?.deviceId || '')}
-            ipCameraMjpegUrl={activeWebRTCDeviceId ? undefined : activeIpCamera?.mjpegUrl}
+            cameraDeviceId={activeMobileDeviceId || activeWebRTCDeviceId || activeIpCamera ? '' : (cameras.activeCamera?.deviceId || '')}
+            ipCameraMjpegUrl={activeWebRTCDeviceId || activeMobileDeviceId ? undefined : activeIpCamera?.mjpegUrl}
             ipCamView={activeIpCamera?.view}
             webrtcStream={activeWebRTCDeviceId ? (webrtcCameraList.find(c => c.deviceId === activeWebRTCDeviceId)?.stream ?? null) : null}
             webrtcCamView={activeWebRTCDeviceId ? activeWebRTCCamView : undefined}
+            mobileMjpegUrl={activeMobileDeviceId ? activeMobileMjpegUrl : undefined}
+            mobileView={activeMobileDeviceId ? activeMobileView : undefined}
+            mobileOrientationAngle={activeMobileDeviceId
+              ? mobileCameras.devices.find(d => d.deviceId === activeMobileDeviceId)?.orientationAngle ?? 0
+              : 0}
+            mobileFacingFront={activeMobileView?.facing === 'front'}
             overlaySettings={overlaySettings}
             logoSettings={logoSettings}
             cameraFallback={cameraFallback}

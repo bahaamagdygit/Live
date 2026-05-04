@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, memo } from 'react'
 import { OverlaySettings, LogoSettings, CameraFallbackSettings } from '../types'
 import { ChurchBorderOverlay } from '../presentation/PresentationApp'
+import { MobileCameraView, filtersToCss } from '../hooks/useMobileCameras'
 import '../presentation/presentation.css'
 
 export type CameraSwitchTransition = 'fade' | 'zoom' | 'slide-left' | 'slide-right' | 'none'
@@ -28,6 +29,14 @@ interface MainPreviewProps {
   // video through a canvas cropped to simulate zoom instead of using CSS scale.
   hardwareZoomSupported?: boolean
   videoElMountRef?: React.RefObject<((el: HTMLVideoElement | null) => void) | undefined>
+  // ── Mobile-bridge source (new LAN architecture) ──────────────────────────
+  mobileMjpegUrl?: string | null
+  mobileView?: MobileCameraView
+  // Phone's current rotation angle, used for canvas-context rotation.
+  mobileOrientationAngle?: 0 | 90 | 180 | 270
+  // Whether the phone's currently-active camera is the front/selfie one —
+  // drives the horizontal mirror applied AFTER rotation.
+  mobileFacingFront?: boolean
 }
 
 const PRESENT_W = 1920
@@ -46,6 +55,116 @@ const VideoOverlayVideo = memo(({ onMount }: { onMount?: (el: HTMLVideoElement |
 ))
 VideoOverlayVideo.displayName = 'VideoOverlayVideo'
 
+// ── Mobile canvas feed ──────────────────────────────────────────────────────
+// Draws the phone's MJPEG stream onto a canvas with a context-level rotation,
+// front-camera mirror, and filter chain. Context-level transforms keep the
+// rotation baked into the output pixels (captureStream-safe), per Problem 3.
+//
+// Problem 3 rotation table:
+//   angle 0   (portrait)              → 0° rotation, frame aspect 9:16
+//   angle 90  (landscape right)       → 0° rotation, frame aspect 16:9
+//   angle 180 (portrait upside-down)  → 180° rotation
+//   angle 270 (landscape left)        → 180° rotation
+//
+// Problem 4: the container aspect ratio follows the incoming frame so the
+// canvas letterboxes/pillarboxes itself inside the fixed 1920×1080 stage.
+// Problem 5: the aspect-ratio change animates over 300ms.
+// Problem 6: rotation first, then horizontal mirror (only when front-facing).
+const MobileCanvasFeed = memo(function MobileCanvasFeed({
+  mjpegUrl, angle, facingFront, view,
+}: {
+  mjpegUrl: string
+  angle: 0 | 90 | 180 | 270
+  facingFront: boolean
+  view?: MobileCameraView
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const imgRef    = useRef<HTMLImageElement>(new Image())
+  const rafRef    = useRef<number | null>(null)
+
+  // Attach the MJPEG to a hidden <img>. The browser continuously decodes
+  // frames into that Image; we snapshot it on every rAF tick.
+  useEffect(() => {
+    const img = imgRef.current
+    img.crossOrigin = 'anonymous'
+    img.src = mjpegUrl
+    return () => { img.src = '' }
+  }, [mjpegUrl])
+
+  // Draw loop. Context-level rotation + mirror keeps pixels correct for
+  // captureStream (Problem 3) and lets rotation animate with a 300ms CSS
+  // transition on the wrapper without ever freezing the stream (Problem 5).
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Canvas always matches the 16:9 presentation stage so the feed fills it
+    // at full resolution (never appears tiny). Portrait frames are center-
+    // cropped via `cover` fitting so the phone operator's subject stays large.
+    canvas.width  = 1920
+    canvas.height = 1080
+
+    const draw = () => {
+      rafRef.current = requestAnimationFrame(draw)
+      const img = imgRef.current
+      const iw = img.naturalWidth, ih = img.naturalHeight
+      if (!iw || !ih) return
+
+      ctx.save()
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.translate(canvas.width / 2, canvas.height / 2)
+      if (facingFront) ctx.scale(-1, 1)
+      if (view)        ctx.filter = filtersToCss(view.filters)
+
+      // Cover (fill) scaling: the frame always fills the canvas; overflow is
+      // cropped. For a portrait phone feed this trims the top/bottom so the
+      // centre of the image is shown large instead of shrunk with black bars.
+      const canvasAR = canvas.width / canvas.height
+      const imgAR    = iw / ih
+      let dw: number, dh: number
+      if (imgAR > canvasAR) { dh = canvas.height; dw = dh * imgAR }
+      else                  { dw = canvas.width;  dh = dw / imgAR }
+
+      const zoom    = Math.max(1, view?.zoom ?? 1)
+      const offsetX = ((view?.offsetX ?? 0) / 100) * (canvas.width  / 2)
+      const offsetY = ((view?.offsetY ?? 0) / 100) * (canvas.height / 2)
+      try {
+        ctx.drawImage(img,
+          -(dw * zoom) / 2 + offsetX,
+          -(dh * zoom) / 2 + offsetY,
+          dw * zoom, dh * zoom)
+      } catch {}
+      ctx.restore()
+    }
+    rafRef.current = requestAnimationFrame(draw)
+    return () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current) }
+    // angle is kept as a dep so the effect re-runs if the phone rotates;
+    // canvas dimensions themselves don't depend on it anymore.
+  }, [angle, facingFront, view])
+
+  // Canvas always fills the full 16:9 presentation stage. The "cover" draw
+  // inside the rAF loop ensures portrait frames show up large (center-crop)
+  // instead of small-with-pillarbox. 300 ms CSS transition kept on opacity in
+  // case we later want to fade the layer.
+  return (
+    <div
+      className="mobile-stage"
+      style={{
+        position: 'absolute', inset: 0,
+        background: '#000', overflow: 'hidden',
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        style={{ width: '100%', height: '100%', display: 'block' }}
+      />
+    </div>
+  )
+})
+
 export function MainPreview({
   cameraDeviceId,
   ipCameraMjpegUrl,
@@ -60,6 +179,10 @@ export function MainPreview({
   ipCamView,
   hardwareZoomSupported = false,
   videoElMountRef,
+  mobileMjpegUrl,
+  mobileView,
+  mobileOrientationAngle = 0,
+  mobileFacingFront = false,
 }: MainPreviewProps) {
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
   const webrtcVideoRef = useRef<HTMLVideoElement>(null)
@@ -281,7 +404,7 @@ export function MainPreview({
         )}
 
         {/* USB camera feed */}
-        {!ipCameraMjpegUrl && !webrtcStream && (
+        {!ipCameraMjpegUrl && !webrtcStream && !mobileMjpegUrl && (
           <>
             <video
               ref={cameraVideoRef}
@@ -317,8 +440,19 @@ export function MainPreview({
           </>
         )}
 
+        {/* Mobile phone camera feed — canvas-based so the rotation lives in
+            the output pixels (captureStream-safe per Problem 3). */}
+        {mobileMjpegUrl && !showFallback && (
+          <MobileCanvasFeed
+            mjpegUrl={mobileMjpegUrl}
+            angle={mobileOrientationAngle}
+            facingFront={mobileFacingFront}
+            view={mobileView}
+          />
+        )}
+
         {/* IP camera MJPEG feed */}
-        {ipCameraMjpegUrl && !webrtcStream && !showFallback && (
+        {ipCameraMjpegUrl && !webrtcStream && !mobileMjpegUrl && !showFallback && (
           <img
             src={ipCameraMjpegUrl}
             className={`presentation-camera presentation-camera--ipcam presentation-camera--fit-${ipCamView?.fit ?? 'cover'}`}

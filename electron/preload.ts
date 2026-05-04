@@ -127,4 +127,46 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('webrtc-signal', fn)
     return () => ipcRenderer.removeListener('webrtc-signal', fn)
   },
+  // ── Mobile Bridge (new two-way LAN control + TCP video) ────────────────────
+  mbStart: () => ipcRenderer.invoke('mb-start'),
+  mbStop:  () => ipcRenderer.invoke('mb-stop'),
+  mbListDevices: () => ipcRenderer.invoke('mb-list-devices'),
+  mbSendCommand: (deviceId: string, action: string, value?: unknown) =>
+    ipcRenderer.send('mb-send-command', { deviceId, action, value }),
+  mbBroadcastReading: (text: string, langs?: string[]) =>
+    ipcRenderer.send('mb-broadcast-reading', { text, langs }),
+  mbBroadcastFilter: (deviceId: string, value: Record<string, unknown>) =>
+    ipcRenderer.send('mb-broadcast-filter', { deviceId, value }),
+  mbBroadcastDesktopState: (value: Record<string, unknown>) =>
+    ipcRenderer.send('mb-broadcast-desktop-state', value),
+  onMobileDeviceJoined: (cb: (d: { device: any }) => void) => {
+    const fn = (_: any, d: any) => cb(d)
+    ipcRenderer.on('mobile-device-joined', fn)
+    return () => ipcRenderer.removeListener('mobile-device-joined', fn)
+  },
+  onMobileDeviceUpdated: (cb: (d: { device: any }) => void) => {
+    const fn = (_: any, d: any) => cb(d)
+    ipcRenderer.on('mobile-device-updated', fn)
+    return () => ipcRenderer.removeListener('mobile-device-updated', fn)
+  },
+  onMobileDeviceDisconnected: (cb: (d: { deviceId: string; reason: string }) => void) => {
+    const fn = (_: any, d: any) => cb(d)
+    ipcRenderer.on('mobile-device-disconnected', fn)
+    return () => ipcRenderer.removeListener('mobile-device-disconnected', fn)
+  },
+  onMobileFrameFrozen: (cb: (d: { deviceId: string }) => void) => {
+    const fn = (_: any, d: any) => cb(d)
+    ipcRenderer.on('mobile-frame-frozen', fn)
+    return () => ipcRenderer.removeListener('mobile-frame-frozen', fn)
+  },
+  onMobileControl: (cb: (d: { deviceId: string; action: string; value?: unknown }) => void) => {
+    const fn = (_: any, d: any) => cb(d)
+    ipcRenderer.on('mobile-control', fn)
+    return () => ipcRenderer.removeListener('mobile-control', fn)
+  },
+  onMobileRequestState: (cb: (d: { deviceId: string }) => void) => {
+    const fn = (_: any, d: any) => cb(d)
+    ipcRenderer.on('mobile-request-state', fn)
+    return () => ipcRenderer.removeListener('mobile-request-state', fn)
+  },
 })

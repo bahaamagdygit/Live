@@ -15,6 +15,7 @@ import { execSync } from 'child_process'
 import AdmZip from 'adm-zip'
 import { WebSocketServer } from 'ws'
 import QRCode from 'qrcode'
+import { mobileBridge, CONTROL_PORT as MOBILE_CONTROL_PORT, VIDEO_PORT as MOBILE_VIDEO_PORT, MJPEG_PORT as MOBILE_MJPEG_PORT } from './mobile-bridge'
 
 // We use dynamic require for electron-store and officeparser to avoid ESM issues
 let Store: any
@@ -932,6 +933,7 @@ function stopAllProcesses() {
   ipCameraMap.clear()
   stopMobileCamServers()
   stopWebRTCSignalServer()
+  mobileBridge.stop()
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.close()
     presentationWindow = null
@@ -1856,6 +1858,49 @@ ipcMain.handle('mobile-cam-status', async () => {
   const urls = getMobileCamUrls()
   const qrDataUrl = await QRCode.toDataURL(urls.phoneUrl, { width: 200, margin: 1 })
   return { running: true, ...urls, qrDataUrl }
+})
+
+// ── Mobile Bridge (new architecture — WebSocket control + TCP video) ──────────
+
+ipcMain.handle('mb-start', async () => {
+  mobileBridge.setMainWindow(mainWindow)
+  mobileBridge.start()
+  const ip  = mobileBridge.getLocalIp()
+  const url = mobileBridge.getPairingUrl()
+  const payload = mobileBridge.getPairingPayload()
+  const qrDataUrl = await QRCode.toDataURL(payload, { width: 220, margin: 1 })
+  return {
+    success: true, url, ip, qrDataUrl,
+    controlPort: MOBILE_CONTROL_PORT,
+    videoPort:   MOBILE_VIDEO_PORT,
+    mjpegPort:   MOBILE_MJPEG_PORT,
+    devices: mobileBridge.listDevices(),
+  }
+})
+
+ipcMain.handle('mb-stop', async () => {
+  mobileBridge.stop()
+  return { success: true }
+})
+
+ipcMain.handle('mb-list-devices', async () => {
+  return { success: true, devices: mobileBridge.listDevices() }
+})
+
+ipcMain.on('mb-send-command', (_e, { deviceId, action, value }: { deviceId: string; action: string; value?: unknown }) => {
+  mobileBridge.sendCommand(deviceId, action, value)
+})
+
+ipcMain.on('mb-broadcast-reading', (_e, { text, langs }: { text: string; langs?: string[] }) => {
+  mobileBridge.broadcastReading(text, langs || [])
+})
+
+ipcMain.on('mb-broadcast-filter', (_e, { deviceId, value }: { deviceId: string; value: Record<string, unknown> }) => {
+  mobileBridge.broadcastFilterState(deviceId, value)
+})
+
+ipcMain.on('mb-broadcast-desktop-state', (_e, value: Record<string, unknown>) => {
+  mobileBridge.broadcastDesktopState(value)
 })
 
 } // end registerIpcHandlers
