@@ -9,15 +9,19 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import net from 'net'
 import http from 'http'
+import dgram from 'dgram'
 import { BrowserWindow } from 'electron'
 import { networkInterfaces } from 'os'
 
-export const CONTROL_PORT = 8765
-export const VIDEO_PORT   = 8766
+export const CONTROL_PORT  = 8765
+export const VIDEO_PORT    = 8766
 // Local MJPEG multiplexer — renderer pulls frames as <img src="http://127.0.0.1:MJPEG_PORT/dev/<id>">.
 // Zero-copy path: the TCP receiver writes the same JPEG bytes directly to every
 // MJPEG client response without involving IPC or base64 encoding.
-export const MJPEG_PORT   = 18850
+export const MJPEG_PORT    = 18850
+// UDP broadcast port the phone listens on for auto-discovery.
+export const DISCOVERY_PORT = 8767
+const DISCOVERY_INTERVAL_MS = 2000
 
 const HEARTBEAT_INTERVAL_MS = 1000
 const HEARTBEAT_MISS_LIMIT  = 3
@@ -64,6 +68,8 @@ export class MobileBridge {
   private controlServer: WebSocketServer | null = null
   private videoServer:   net.Server | null = null
   private mjpegServer:   http.Server | null = null
+  private discoverySocket: dgram.Socket | null = null
+  private discoveryTimer:  NodeJS.Timeout | null = null
   private sessions = new Map<string, Session>()
   private lastReading: { text: string; langs: string[] } = { text: '', langs: [] }
   private lastFilterState: Record<string, unknown> | null = null
@@ -91,6 +97,50 @@ export class MobileBridge {
     this.mjpegServer.listen(MJPEG_PORT, '127.0.0.1', () => {
       console.log(`[MobileBridge] mjpeg server listening on 127.0.0.1:${MJPEG_PORT}`)
     })
+
+    this.startDiscoveryBroadcaster()
+  }
+
+  /**
+   * UDP discovery beacon. Every 2 s we shout a small JSON payload to the LAN
+   * broadcast address (255.255.255.255). Any phone on the same WiFi can pick
+   * this up without knowing the desktop's IP in advance — that's the whole
+   * point of auto-discovery on networks without internet.
+   */
+  private startDiscoveryBroadcaster() {
+    try {
+      this.discoverySocket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+      this.discoverySocket.on('error', err => console.error('[MobileBridge] discovery error:', err.message))
+      this.discoverySocket.bind(0, () => {
+        try { this.discoverySocket!.setBroadcast(true) } catch {}
+        console.log(`[MobileBridge] discovery beacon broadcasting on UDP/${DISCOVERY_PORT}`)
+      })
+      this.discoveryTimer = setInterval(() => {
+        const sock = this.discoverySocket
+        if (!sock) return
+        const ip = this.getLocalIp()
+        const payload = JSON.stringify({
+          service: 'church-live-stream',
+          version: 1,
+          host: ip,
+          name: 'Church Live Stream Studio',
+          controlPort: CONTROL_PORT,
+          videoPort:   VIDEO_PORT,
+          mjpegPort:   MJPEG_PORT,
+          t: Date.now(),
+        })
+        const buf = Buffer.from(payload, 'utf8')
+        try { sock.send(buf, 0, buf.length, DISCOVERY_PORT, '255.255.255.255') } catch {}
+      }, DISCOVERY_INTERVAL_MS)
+    } catch (err: any) {
+      console.error('[MobileBridge] failed to start discovery beacon:', err.message)
+    }
+  }
+
+  private stopDiscoveryBroadcaster() {
+    if (this.discoveryTimer) { clearInterval(this.discoveryTimer); this.discoveryTimer = null }
+    try { this.discoverySocket?.close() } catch {}
+    this.discoverySocket = null
   }
 
   stop() {
@@ -99,6 +149,7 @@ export class MobileBridge {
     this.controlServer?.close(); this.controlServer = null
     this.videoServer?.close();   this.videoServer = null
     this.mjpegServer?.close();   this.mjpegServer = null
+    this.stopDiscoveryBroadcaster()
   }
 
   getMjpegUrl(deviceId: string): string {
