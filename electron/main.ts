@@ -778,7 +778,9 @@ async function findFFmpeg(): Promise<string> {
 }
 
 
-const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1' || !app.isPackaged
+// Determine if app is in development mode
+// Use only environment variables and directory structure checks (don't use app.isPackaged at module level)
+const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1'
 
 function getAppPath() {
   return isDev ? path.join(__dirname, '..') : path.join(process.resourcesPath)
@@ -949,12 +951,13 @@ function registerIpcHandlers() {
 // Get cameras using PowerShell on Windows
 ipcMain.handle('get-cameras', async () => {
   try {
-    // Try WMI first - more reliable across Windows versions
-    // ClassGuid for image devices (includes cameras)
-    const wmiCommand = `Get-WmiObject Win32_PnPDevice -Filter "ClassGuid='{6994ad05-93d5-11d0-a43d-00a0c9223196'}' AND Status='OK'" | Select-Object -Property Name, DeviceID | ConvertTo-Json`
-
+    console.log('[Camera Detection] Starting camera enumeration...')
     let cameras: any[] = []
+
+    // Method 1: Try WMI - most reliable for Windows cameras
     try {
+      console.log('[Camera Detection] Method 1: Trying WMI query...')
+      const wmiCommand = `Get-WmiObject Win32_PnPDevice -Filter "ClassGuid='{6994ad05-93d5-11d0-a43d-00a0c9223196'}' AND Status='OK'" | Select-Object -Property Name, DeviceID | ConvertTo-Json`
       const result = execSync(
         `powershell -NoProfile -Command "${wmiCommand}"`,
         { timeout: 8000, encoding: 'utf8' }
@@ -970,20 +973,21 @@ ipcMain.handle('get-cameras', async () => {
             label: d.Name || `Camera ${idx + 1}`,
             deviceId: d.DeviceID || String(idx),
           }))
+        if (cameras.length > 0) {
+          console.log(`[Camera Detection] Found ${cameras.length} camera(s) via WMI`)
+          return { success: true, cameras }
+        }
       }
-    } catch (parseErr) {
-      console.warn('WMI camera detection failed:', parseErr instanceof Error ? parseErr.message : 'Parse error')
+    } catch (wmiErr) {
+      console.warn('[Camera Detection] WMI method failed:', wmiErr instanceof Error ? wmiErr.message : 'Unknown error')
     }
 
-    if (cameras.length > 0) {
-      return { success: true, cameras }
-    }
-
-    // Fallback: Try alternative WMI query
+    // Method 2: Try alternative WMI query for USB devices
     try {
-      const altCommand = `Get-PnpDevice | Where-Object {$_.InstanceId -match 'USB.*VID_'} | Select-Object -Property FriendlyName, InstanceId | ConvertTo-Json`
+      console.log('[Camera Detection] Method 2: Trying USB device query...')
+      const usbCommand = `Get-WmiObject Win32_PnPDevice | Where-Object {$_.Name -match 'camera|webcam|usb' -and $_.Status -eq 'OK'} | Select-Object -Property Name | ConvertTo-Json`
       const result = execSync(
-        `powershell -NoProfile -Command "${altCommand}"`,
+        `powershell -NoProfile -Command "${usbCommand}"`,
         { timeout: 5000, encoding: 'utf8' }
       ).toString().trim()
 
@@ -991,20 +995,53 @@ ipcMain.handle('get-cameras', async () => {
         const parsed = JSON.parse(result)
         const devices = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
         cameras = devices
+          .filter((d: any) => d && d.Name && typeof d.Name === 'string')
+          .map((d: any, idx: number) => ({
+            id: `camera_${idx}`,
+            label: d.Name || `Camera ${idx + 1}`,
+            deviceId: d.Name.toLowerCase().replace(/\s+/g, '_'),
+          }))
+        if (cameras.length > 0) {
+          console.log(`[Camera Detection] Found ${cameras.length} device(s) via USB query`)
+          return { success: true, cameras }
+        }
+      }
+    } catch (usbErr) {
+      console.warn('[Camera Detection] USB method failed:', usbErr instanceof Error ? usbErr.message : 'Unknown error')
+    }
+
+    // Method 3: Simple Get-PnpDevice without filters
+    try {
+      console.log('[Camera Detection] Method 3: Trying basic device enumeration...')
+      const basicCommand = `Get-PnpDevice -FriendlyName '*camera*' -ErrorAction SilentlyContinue | Select-Object -Property FriendlyName | ConvertTo-Json`
+      const result = execSync(
+        `powershell -NoProfile -Command "${basicCommand}"`,
+        { timeout: 5000, encoding: 'utf8' }
+      ).toString().trim()
+
+      if (result && result.length > 0 && result !== 'null') {
+        const parsed = JSON.parse(result)
+        const devices = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
+        cameras = devices
           .filter((d: any) => d && d.FriendlyName)
           .map((d: any, idx: number) => ({
             id: `camera_${idx}`,
             label: d.FriendlyName || `Camera ${idx + 1}`,
-            deviceId: d.InstanceId || String(idx),
+            deviceId: d.FriendlyName.toLowerCase().replace(/\s+/g, '_'),
           }))
+        if (cameras.length > 0) {
+          console.log(`[Camera Detection] Found ${cameras.length} camera(s) via basic enumeration`)
+          return { success: true, cameras }
+        }
       }
-    } catch (altErr) {
-      console.warn('Alternative camera detection also failed:', altErr instanceof Error ? altErr.message : 'Unknown error')
+    } catch (basicErr) {
+      console.warn('[Camera Detection] Basic method failed:', basicErr instanceof Error ? basicErr.message : 'Unknown error')
     }
 
-    return { success: true, cameras }
+    console.log('[Camera Detection] No cameras found using any method')
+    return { success: true, cameras: [] }
   } catch (err: any) {
-    console.warn('Camera detection error:', err.message)
+    console.error('[Camera Detection] Unexpected error:', err.message)
     return { success: true, cameras: [] }
   }
 })
