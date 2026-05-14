@@ -188,6 +188,8 @@ export function useCameras(): UseCamerasReturn {
 
     try {
       let browserDevices: Camera[] = []
+      let permissionDenied = false
+
       try {
         // If no stream is active yet we need a temporary getUserMedia to unlock
         // device labels. If a stream is already open we can enumerate directly —
@@ -195,8 +197,15 @@ export function useCameras(): UseCamerasReturn {
         // briefly activate the front/default camera, which on some platforms
         // triggers a devicechange event and interrupts the active camera stream.
         if (!streamRef.current) {
-          const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
-          tempStream.getTracks().forEach((t) => t.stop())
+          try {
+            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
+            tempStream.getTracks().forEach((t) => t.stop())
+          } catch (permErr: any) {
+            // If permission is denied, enumerate anyway (devices will have empty labels)
+            if (permErr.name === 'NotAllowedError') {
+              permissionDenied = true
+            }
+          }
         }
 
         const devices = await navigator.mediaDevices.enumerateDevices()
@@ -207,7 +216,10 @@ export function useCameras(): UseCamerasReturn {
             label: d.label || `Camera ${idx + 1}`,
             deviceId: d.deviceId || String(idx),
           }))
-      } catch (err) {}
+      } catch (err) {
+        // If enumeration fails completely, still try electron API
+        browserDevices = []
+      }
 
       let electronDevices: Camera[] = []
       if (window.electronAPI) {
@@ -245,6 +257,11 @@ export function useCameras(): UseCamerasReturn {
         const savedView = camViewMapRef.current[first.deviceId] ?? DEFAULT_CAM_VIEW
         camViewRef.current = savedView
         selectCameraByIdRef.current(first, savedView)
+      }
+
+      // Show error if no cameras found and no other reason
+      if (merged.length === 0 && permissionDenied) {
+        setCameraError('Camera permission denied. Please grant permission to detect cameras.')
       }
     } catch (err: any) {
       setCameraError(err.message || 'Failed to enumerate cameras')

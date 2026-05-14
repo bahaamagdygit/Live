@@ -950,31 +950,60 @@ function registerIpcHandlers() {
 ipcMain.handle('get-cameras', async () => {
   try {
     const psCommand = `
-      Get-PnpDevice -Class Camera -Status OK | Select-Object -Property FriendlyName, DeviceID | ConvertTo-Json
+      [void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');
+      [Windows.Media.Capture.MediaDeviceType] | Out-Null;
+      Get-PnpDevice -Class Camera | Where-Object {$_.Status -eq 'OK'} | Select-Object -Property FriendlyName, DeviceID | ConvertTo-Json
     `
-    const result = execSync(
-      `powershell -Command "${psCommand.replace(/\n/g, ' ')}"`,
-      { timeout: 5000 }
-    ).toString()
 
-    let devices: any[] = []
+    let cameras: any[] = []
     try {
-      const parsed = JSON.parse(result)
-      devices = Array.isArray(parsed) ? parsed : [parsed]
-    } catch {
-      devices = []
-    }
+      const result = execSync(
+        `powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`,
+        { timeout: 10000, encoding: 'utf8' }
+      ).toString().trim()
 
-    const cameras = devices
-      .filter((d: any) => d && d.FriendlyName)
-      .map((d: any, idx: number) => ({
-        id: String(idx),
-        label: d.FriendlyName || `Camera ${idx + 1}`,
-        deviceId: d.DeviceID || String(idx),
-      }))
+      if (result && result.length > 0) {
+        const parsed = JSON.parse(result)
+        const devices = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
+        cameras = devices
+          .filter((d: any) => d && (d.FriendlyName || d.DeviceID))
+          .map((d: any, idx: number) => ({
+            id: `camera_${d.DeviceID || idx}`,
+            label: d.FriendlyName || `Camera ${idx + 1}`,
+            deviceId: d.DeviceID || String(idx),
+          }))
+      }
+    } catch (parseErr) {
+      console.warn('Failed to parse camera list from PowerShell:', parseErr)
+    }
 
     return { success: true, cameras }
   } catch (err: any) {
+    console.warn('PowerShell camera detection failed, retrying with alternative method:', err.message)
+
+    // Fallback: Try WMI if PowerShell fails
+    try {
+      const wmiCommand = `Get-WmiObject Win32_PnPDevice -Filter "ClassGuid='{6994ad05-93d5-11d0-a43d-00a0c9223196'}'" | Select Name`
+      const result = execSync(
+        `powershell -NoProfile -Command "${wmiCommand}"`,
+        { timeout: 5000, encoding: 'utf8' }
+      ).toString()
+
+      if (result.trim()) {
+        const cameras = result.split('\n')
+          .map((line, idx) => line.trim())
+          .filter(line => line && !line.startsWith('Name'))
+          .map((label, idx) => ({
+            id: `camera_${idx}`,
+            label: label || `Camera ${idx + 1}`,
+            deviceId: label.toLowerCase().replace(/\s+/g, '_'),
+          }))
+        return { success: true, cameras }
+      }
+    } catch (wmiErr) {
+      console.warn('WMI camera detection also failed:', wmiErr instanceof Error ? wmiErr.message : 'Unknown error')
+    }
+
     return { success: true, cameras: [] }
   }
 })

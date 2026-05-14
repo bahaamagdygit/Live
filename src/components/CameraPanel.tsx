@@ -522,6 +522,16 @@ export function CameraPanel({
       <div className="panel__content">
         {error && <div className="alert alert--error"><span>⚠️</span> {error}</div>}
 
+        {/* Empty state with more context */}
+        {!error && cameras.length === 0 && !isLoading && mobileBridgeDevices.length === 0 && webrtcCameras.length === 0 && ipCameras.length === 0 && (
+          <div className="empty-state">
+            <div className="empty-state__icon">📷</div>
+            <p>No cameras detected</p>
+            <p style={{ fontSize: '0.9em', color: '#999', margin: '8px 0 12px' }}>Check that cameras are connected and permissions are granted</p>
+            <button type="button" className="btn btn--secondary btn--sm" onClick={onRefresh}>Refresh</button>
+          </div>
+        )}
+
         {/* ── Pair Mobile Phone (new LAN bridge) ── */}
         {showWebRTCModal && mobileBridgePairingQrUrl && (
           <div className="mb-pair-card">
@@ -540,13 +550,6 @@ export function CameraPanel({
               </div>
             </div>
             <button type="button" className="mb-pair-card__close" onClick={() => setShowWebRTCModal(false)} title="Close">✕</button>
-          </div>
-        )}
-        {!error && cameras.length === 0 && !isLoading && (
-          <div className="empty-state">
-            <div className="empty-state__icon">📷</div>
-            <p>No cameras detected</p>
-            <button type="button" className="btn btn--secondary btn--sm" onClick={onRefresh}>Refresh</button>
           </div>
         )}
         {isLoading && <div className="empty-state"><div className="spinner" /><p>Detecting cameras...</p></div>}
