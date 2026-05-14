@@ -1,3 +1,117 @@
+/*
+╔════════════════════════════════════════════════════════════════════════════╗
+║         CHURCH LIVE STREAM STUDIO - SETUP & DEPLOYMENT GUIDE              ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+STEP 1: BUILD THE APP ON YOUR DEVELOPMENT PC
+═════════════════════════════════════════════
+1. Open terminal/command prompt in the project directory: D:\MyProjects\LiveStream\Live
+2. Run: npm run build
+3. Wait for build to complete (2-3 minutes)
+4. The installer will be created at: release/Church Live Stream Studio Setup 1.0.0.exe
+
+STEP 2: COPY INSTALLER TO ANOTHER PC
+═════════════════════════════════════
+1. Copy the file from: release/Church Live Stream Studio Setup 1.0.0.exe
+2. Transfer it to the other PC (USB drive, email, cloud storage, etc.)
+3. On the other PC, double-click the .exe file to install
+
+STEP 3: INSTALL ON THE OTHER PC
+════════════════════════════════
+1. Run the installer (Church Live Stream Studio Setup 1.0.0.exe)
+2. Follow the installation wizard
+3. Choose installation location (C:\Program Files\Church Live Stream Studio or custom)
+4. Wait for installation to complete
+5. The app will start automatically after installation
+
+STEP 4: CONNECT CAMERAS
+═══════════════════════
+1. Connect your USB cameras to the PC
+2. Open the Church Live Stream Studio app
+3. Go to the Cameras panel (left side)
+4. Click the "Refresh" button (↺)
+5. The app will detect and list all connected cameras
+6. If cameras don't show:
+   - Check that cameras are properly connected
+   - Grant camera permissions when prompted
+   - Try clicking Refresh again
+   - Check DevTools console (F12) for error messages starting with [Camera Detection]
+
+STEP 5: CONFIGURE IP CAMERAS (Optional)
+════════════════════════════════════════
+1. In Cameras panel, click the "📡" button (IP Camera)
+2. Enter camera IP address, port, username, and password
+3. Click "Connect"
+4. The app will connect to the IP camera stream
+
+STEP 6: CONFIGURE STREAM SETTINGS
+══════════════════════════════════
+1. Click the Settings button (⚙️) at the top
+2. Enter your RTMP stream URL (e.g., rtmp://live.youtube.com/live2)
+3. Enter your stream key
+4. Set resolution (720p, 1080p, etc.) and bitrate
+5. Save settings
+
+STEP 7: START STREAMING
+═══════════════════════
+1. Select a camera from the Cameras panel
+2. Click "Start Stream" button
+3. Monitor the stream quality in real-time
+4. Click "Stop Stream" to end broadcasting
+
+═══════════════════════════════════════════════════════════════════════════════
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+CAMERAS NOT DETECTED
+────────────────────
+If the "No cameras detected" message appears:
+1. Ensure USB cameras are plugged in
+2. Check Device Manager (devmgmt.msc) - cameras should be listed
+3. Try restarting the app
+4. Try a different USB port
+5. Update camera drivers from manufacturer website
+6. Check Windows camera permissions:
+   - Settings → Privacy & Security → Camera
+   - Ensure "Camera access" is enabled
+   - Allow the app to access camera
+
+CAMERA SHOWS AS "OFFLINE"
+──────────────────────────
+1. The camera may have disconnected
+2. Unplug and reconnect the camera
+3. Click the Refresh button (↺)
+4. Restart the app if still offline
+
+IP CAMERA NOT CONNECTING
+─────────────────────────
+1. Verify the IP address is correct
+2. Check if camera is on the same network
+3. Verify username and password
+4. Check if RTSP port (usually 554) is open
+5. Try pinging the camera IP to test connection
+
+STREAM NOT WORKING
+───────────────────
+1. Verify RTMP URL and stream key are correct
+2. Check your internet connection speed
+3. Reduce bitrate in settings if experiencing lag
+4. Check firewall isn't blocking RTMP port (1935)
+5. Restart the stream
+
+═══════════════════════════════════════════════════════════════════════════════
+SYSTEM REQUIREMENTS
+═══════════════════════════════════════════════════════════════════════════════
+- Windows 10 or later (64-bit)
+- 4GB RAM minimum (8GB recommended)
+- 2GB free disk space
+- USB cameras or IP cameras (RTSP)
+- Internet connection for streaming
+- PowerShell (usually pre-installed on Windows)
+
+═══════════════════════════════════════════════════════════════════════════════
+*/
+
 import {
   app,
   BrowserWindow,

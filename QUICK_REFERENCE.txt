@@ -1,0 +1,171 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    CHURCH LIVE STREAM STUDIO
+                      QUICK REFERENCE CARD
+═══════════════════════════════════════════════════════════════════════════════
+
+📦 BUILDING & DISTRIBUTING
+═══════════════════════════════════════════════════════════════════════════════
+
+1. BUILD ON DEVELOPMENT PC:
+   Command Prompt or PowerShell:
+
+   cd D:\MyProjects\LiveStream\Live
+   npm run build
+
+   ⏳ Wait 3-5 minutes
+
+   📁 Installer created at:
+   release/Church Live Stream Studio Setup 1.0.0.exe
+
+2. COPY INSTALLER TO ANOTHER PC:
+   - USB drive
+   - Email attachment
+   - Cloud storage (Google Drive, OneDrive)
+   - Network share
+
+3. INSTALL ON OTHER PC:
+   - Double-click the .exe file
+   - Follow wizard
+   - Choose location (default: C:\Program Files\Church Live Stream Studio)
+   - Let it finish
+   - App opens automatically
+
+
+🎥 CAMERA SETUP (After Installation)
+═══════════════════════════════════════════════════════════════════════════════
+
+USB CAMERA:
+1. Plug in camera to USB port
+2. Wait 5 seconds for Windows to detect
+3. In app → Click "Refresh" ↺
+4. Camera appears → Click it
+5. Ready to stream!
+
+IP CAMERA (Network):
+1. Camera IP on same network
+2. App → Click 📡 (IP Camera)
+3. Fill in: IP, Port (554), Username, Password
+4. Click "Connect"
+5. Stream appears
+
+MOBILE CAMERA:
+1. App → Click 📱 (Mobile)
+2. Scan QR code with phone
+3. Phone and PC on same WiFi
+4. Phone camera appears
+
+
+⚙️ STREAMING SETUP
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Settings ⚙️
+2. Enter RTMP URL:
+   YouTube: rtmp://live.youtube.com/live2
+   Facebook: (from your streaming platform)
+3. Enter Stream Key: (from your streaming platform)
+4. Set Resolution: 720p or 1080p
+5. Set Bitrate: 2500-3000 Kbps
+6. Save
+
+7. Select camera
+8. Click "Start Stream"
+9. You're live!
+
+
+🔧 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+NO CAMERAS SHOWING?
+→ Check Windows Settings → Privacy → Camera (ON)
+→ Device Manager (Win+X) → Look for camera
+→ Update drivers if needed
+→ Try different USB port
+→ Restart app
+→ Click "Refresh" button
+
+CAMERA OFFLINE?
+→ Unplug camera
+→ Wait 5 seconds
+→ Plug back in
+→ Click "Refresh"
+
+IP CAMERA NOT CONNECTING?
+→ Verify IP address is correct
+→ Check username/password
+→ Ping camera: Win+R → cmd → ping 192.168.1.100
+
+STREAM LAGGY?
+→ Lower resolution to 720p
+→ Lower bitrate to 2000 Kbps
+→ Close other apps
+→ Use ethernet cable (not WiFi)
+
+
+📊 INTERNET SPEED NEEDED
+═══════════════════════════════════════════════════════════════════════════════
+
+Quality          Resolution    Bitrate    Internet Needed
+────────────────────────────────────────────────────────
+Low (Phone)      480p          1500 Kbps  3-4 Mbps
+Standard         720p          2500 Kbps  5-6 Mbps
+HD (Recommended) 1080p         3500 Kbps  7-8 Mbps
+Full HD          1080p 60fps   5000 Kbps  10-12 Mbps
+
+
+🛠️ DEVELOPMENT COMMANDS
+═══════════════════════════════════════════════════════════════════════════════
+
+npm run dev       → Start dev server (hot reload for testing)
+npm run build     → Build installer for distribution
+npm run preview   → Preview the built app
+
+
+📁 FILE LOCATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+Installer:             D:\MyProjects\LiveStream\Live\release\*.exe
+Source Code:          D:\MyProjects\LiveStream\Live\electron\main.ts
+Setup Guide:          D:\MyProjects\LiveStream\Live\SETUP_GUIDE.md
+Camera Detection:     Lines 949-1010 in electron/main.ts
+Preload Script:       D:\MyProjects\LiveStream\Live\electron\preload.ts
+
+
+🎯 STREAMING PLATFORMS
+═══════════════════════════════════════════════════════════════════════════════
+
+YouTube:
+  URL: rtmp://live.youtube.com/live2
+  Get Key: youtube.com → Camera icon → Go Live → Manage
+
+Facebook:
+  URL: (from your Go Live settings)
+  Get Key: facebook.com → Live Video → Manage
+
+Twitch:
+  URL: rtmp://live-ord.twitch.tv/live
+  Get Key: twitch.tv → Creator Dashboard → Stream Key
+
+
+⚠️ IMPORTANT NOTES
+═══════════════════════════════════════════════════════════════════════════════
+
+✓ Windows 10 or 11 (64-bit) REQUIRED
+✓ 4GB RAM minimum (8GB recommended)
+✓ 5+ Mbps internet for streaming
+✓ USB cameras need proper Windows drivers
+✓ IP cameras need to be on same network as PC
+✓ Wired ethernet better than WiFi
+✓ Keep camera plugged in during stream
+
+
+📞 DEBUG MODE
+═══════════════════════════════════════════════════════════════════════════════
+
+Press F12 in app → Console tab
+Look for: [Camera Detection] messages
+Save logs for troubleshooting
+
+
+═══════════════════════════════════════════════════════════════════════════════
+For full details, see: SETUP_GUIDE.md
+═══════════════════════════════════════════════════════════════════════════════
