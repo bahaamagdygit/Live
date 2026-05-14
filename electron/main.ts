@@ -949,61 +949,62 @@ function registerIpcHandlers() {
 // Get cameras using PowerShell on Windows
 ipcMain.handle('get-cameras', async () => {
   try {
-    const psCommand = `
-      [void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');
-      [Windows.Media.Capture.MediaDeviceType] | Out-Null;
-      Get-PnpDevice -Class Camera | Where-Object {$_.Status -eq 'OK'} | Select-Object -Property FriendlyName, DeviceID | ConvertTo-Json
-    `
+    // Try WMI first - more reliable across Windows versions
+    // ClassGuid for image devices (includes cameras)
+    const wmiCommand = `Get-WmiObject Win32_PnPDevice -Filter "ClassGuid='{6994ad05-93d5-11d0-a43d-00a0c9223196'}' AND Status='OK'" | Select-Object -Property Name, DeviceID | ConvertTo-Json`
 
     let cameras: any[] = []
     try {
       const result = execSync(
-        `powershell -NoProfile -Command "${psCommand.replace(/\n/g, ' ')}"`,
-        { timeout: 10000, encoding: 'utf8' }
+        `powershell -NoProfile -Command "${wmiCommand}"`,
+        { timeout: 8000, encoding: 'utf8' }
       ).toString().trim()
 
       if (result && result.length > 0) {
         const parsed = JSON.parse(result)
         const devices = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
         cameras = devices
-          .filter((d: any) => d && (d.FriendlyName || d.DeviceID))
+          .filter((d: any) => d && d.Name)
           .map((d: any, idx: number) => ({
-            id: `camera_${d.DeviceID || idx}`,
-            label: d.FriendlyName || `Camera ${idx + 1}`,
+            id: `camera_${idx}`,
+            label: d.Name || `Camera ${idx + 1}`,
             deviceId: d.DeviceID || String(idx),
           }))
       }
     } catch (parseErr) {
-      console.warn('Failed to parse camera list from PowerShell:', parseErr)
+      console.warn('WMI camera detection failed:', parseErr instanceof Error ? parseErr.message : 'Parse error')
+    }
+
+    if (cameras.length > 0) {
+      return { success: true, cameras }
+    }
+
+    // Fallback: Try alternative WMI query
+    try {
+      const altCommand = `Get-PnpDevice | Where-Object {$_.InstanceId -match 'USB.*VID_'} | Select-Object -Property FriendlyName, InstanceId | ConvertTo-Json`
+      const result = execSync(
+        `powershell -NoProfile -Command "${altCommand}"`,
+        { timeout: 5000, encoding: 'utf8' }
+      ).toString().trim()
+
+      if (result && result.length > 0) {
+        const parsed = JSON.parse(result)
+        const devices = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
+        cameras = devices
+          .filter((d: any) => d && d.FriendlyName)
+          .map((d: any, idx: number) => ({
+            id: `camera_${idx}`,
+            label: d.FriendlyName || `Camera ${idx + 1}`,
+            deviceId: d.InstanceId || String(idx),
+          }))
+      }
+    } catch (altErr) {
+      console.warn('Alternative camera detection also failed:', altErr instanceof Error ? altErr.message : 'Unknown error')
     }
 
     return { success: true, cameras }
   } catch (err: any) {
-    console.warn('PowerShell camera detection failed, retrying with alternative method:', err.message)
-
-    // Fallback: Try WMI if PowerShell fails
-    try {
-      const wmiCommand = `Get-WmiObject Win32_PnPDevice -Filter "ClassGuid='{6994ad05-93d5-11d0-a43d-00a0c9223196'}'" | Select Name`
-      const result = execSync(
-        `powershell -NoProfile -Command "${wmiCommand}"`,
-        { timeout: 5000, encoding: 'utf8' }
-      ).toString()
-
-      if (result.trim()) {
-        const cameras = result.split('\n')
-          .map((line, idx) => line.trim())
-          .filter(line => line && !line.startsWith('Name'))
-          .map((label, idx) => ({
-            id: `camera_${idx}`,
-            label: label || `Camera ${idx + 1}`,
-            deviceId: label.toLowerCase().replace(/\s+/g, '_'),
-          }))
-        return { success: true, cameras }
-      }
-    } catch (wmiErr) {
-      console.warn('WMI camera detection also failed:', wmiErr instanceof Error ? wmiErr.message : 'Unknown error')
-    }
-
+    console.warn('Camera detection error:', err.message)
     return { success: true, cameras: [] }
   }
 })
