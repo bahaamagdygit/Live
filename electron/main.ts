@@ -1063,6 +1063,10 @@ function stopAllProcesses() {
 function registerIpcHandlers() {
 
 // Get cameras using PowerShell on Windows
+// NOTE: Audio/Microphone is INTENTIONALLY DISABLED throughout the app
+// - All getUserMedia calls use audio: false
+// - No microphone permissions are requested
+// - Camera-only streaming (no audio capture)
 ipcMain.handle('get-cameras', async () => {
   try {
     console.log('[Camera Detection] Starting camera enumeration...')
@@ -1081,7 +1085,16 @@ ipcMain.handle('get-cameras', async () => {
         const parsed = JSON.parse(result)
         const devices = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
         cameras = devices
-          .filter((d: any) => d && d.Name)
+          .filter((d: any) => {
+            // Only include video devices, exclude audio/microphone devices
+            if (!d || !d.Name) return false
+            const name = d.Name.toLowerCase()
+            // Exclude microphones, speakers, and audio devices
+            const isAudioDevice = name.includes('microphone') || name.includes('mic') ||
+                                 name.includes('speaker') || name.includes('audio') ||
+                                 name.includes('input device')
+            return !isAudioDevice
+          })
           .map((d: any, idx: number) => ({
             id: `camera_${idx}`,
             label: d.Name || `Camera ${idx + 1}`,
@@ -1129,7 +1142,15 @@ ipcMain.handle('get-cameras', async () => {
           const parsed = JSON.parse(result)
           const devices = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'string' ? [parsed] : [])
           const newCameras = devices
-            .filter((d: any) => d && typeof d === 'string' && d.trim().length > 0)
+            .filter((d: any) => {
+              if (!d || typeof d !== 'string' || d.trim().length === 0) return false
+              const name = String(d).toLowerCase()
+              // Exclude microphones and audio devices
+              const isAudioDevice = name.includes('microphone') || name.includes('mic') ||
+                                   name.includes('speaker') || name.includes('audio') ||
+                                   name.includes('input device')
+              return !isAudioDevice
+            })
             .map((d: any, idx: number) => ({
               id: `camera_${cameras.length + idx}`,
               label: String(d).trim(),
@@ -1160,7 +1181,15 @@ ipcMain.handle('get-cameras', async () => {
         const parsed = JSON.parse(result)
         const devices = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
         const newCameras = devices
-          .filter((d: any) => d && (d.Name || d.Description) && typeof (d.Name || d.Description) === 'string')
+          .filter((d: any) => {
+            if (!d || typeof (d.Name || d.Description) !== 'string') return false
+            const name = (d.Name || d.Description || '').toLowerCase()
+            // Exclude microphones, speakers, and audio devices
+            const isAudioDevice = name.includes('microphone') || name.includes('mic') ||
+                                 name.includes('speaker') || name.includes('audio') ||
+                                 name.includes('input device')
+            return !isAudioDevice
+          })
           .map((d: any, idx: number) => {
             const name = (d.Name || d.Description || `Camera ${idx + 1}`).trim()
             return {
@@ -1193,7 +1222,15 @@ ipcMain.handle('get-cameras', async () => {
         const parsed = JSON.parse(result)
         const devices = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
         const newCameras = devices
-          .filter((d: any) => d && d.FriendlyName && typeof d.FriendlyName === 'string')
+          .filter((d: any) => {
+            if (!d || !d.FriendlyName || typeof d.FriendlyName !== 'string') return false
+            const name = d.FriendlyName.toLowerCase()
+            // Exclude microphones, speakers, and audio devices
+            const isAudioDevice = name.includes('microphone') || name.includes('mic') ||
+                                 name.includes('speaker') || name.includes('audio') ||
+                                 name.includes('input device')
+            return !isAudioDevice
+          })
           .map((d: any, idx: number) => {
             const name = d.FriendlyName.trim()
             return {

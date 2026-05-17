@@ -122,6 +122,7 @@ export function useCameras(): UseCamerasReturn {
         ? { deviceId: { ideal: camera.deviceId } }
         : {}
 
+      // Audio is intentionally disabled - video only (no microphone/audio capture)
       const attempts: MediaStreamConstraints[] = [
         { video: { ...videoBase, width: { ideal: res.width }, height: { ideal: res.height }, frameRate: { ideal: fps } }, audio: false },
         { video: { ...videoBase }, audio: false },
@@ -198,6 +199,7 @@ export function useCameras(): UseCamerasReturn {
         // triggers a devicechange event and interrupts the active camera stream.
         if (!streamRef.current) {
           try {
+            // Temporary stream to unlock device labels (audio disabled - video only)
               const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
             tempStream.getTracks().forEach((t) => t.stop())
           } catch (permErr: any) {
