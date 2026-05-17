@@ -1071,7 +1071,7 @@ ipcMain.handle('get-cameras', async () => {
     // Method 1: Try WMI - most reliable for physical Windows cameras
     try {
       console.log('[Camera Detection] Method 1: Trying WMI query for physical cameras...')
-      const wmiCommand = `Get-WmiObject Win32_PnPDevice -Filter "ClassGuid='{6994ad05-93d5-11d0-a43d-00a0c9223196}' AND Status='OK'" | Select-Object -Property Name, DeviceID | ConvertTo-Json`
+      const wmiCommand = `Get-WmiObject Win32_PnPDevice -Filter "ClassGuid = '{6994ad05-93d5-11d0-a43d-00a0c9223196}'" | Where-Object {$_.Status -eq 'OK'} | Select-Object -Property Name, DeviceID | ConvertTo-Json`
       const result = execSync(
         `powershell -NoProfile -Command "${wmiCommand}"`,
         { timeout: 8000, encoding: 'utf8' }
