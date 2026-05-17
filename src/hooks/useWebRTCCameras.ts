@@ -39,7 +39,14 @@ export function useWebRTCCameras() {
 
   const removeCamera = useCallback((deviceId: string) => {
     clearPeer(deviceId)
-    setCameras(prev => prev.filter(c => c.deviceId !== deviceId))
+    setCameras(prev => {
+      // Stop any audio tracks on the stored stream for this camera
+      const cam = prev.find(c => c.deviceId === deviceId)
+      try {
+        cam?.stream?.getAudioTracks().forEach(t => { try { t.stop() } catch {} })
+      } catch {}
+      return prev.filter(c => c.deviceId !== deviceId)
+    })
   }, [clearPeer])
 
   // ── main effect — runs once, never re-registers listeners ────────────────
@@ -75,13 +82,26 @@ export function useWebRTCCameras() {
       }, 15_000)
       timeouts.current.set(deviceId, timeout)
 
-      // Track received → mark connected with live stream
+      // Track received → mark connected with live stream. Strip any audio
+      // tracks so we only keep video (phones may send audio unintentionally).
       pc.ontrack = (event) => {
-        const stream = event.streams[0]
+        const raw = event.streams[0]
+        if (!raw) return
+        // Stop and remove audio tracks if present
+        try {
+          raw.getAudioTracks().forEach(t => { try { t.stop() } catch {} })
+        } catch {}
+        // Build a new MediaStream containing only video tracks to avoid
+        // carrying any audio into the app.
+        const videoOnly = new MediaStream()
+        try {
+          raw.getVideoTracks().forEach(t => videoOnly.addTrack(t))
+        } catch {}
+
         const t = timeouts.current.get(deviceId)
         if (t) { clearTimeout(t); timeouts.current.delete(deviceId) }
         setCameras(prev => prev.map(c =>
-          c.deviceId === deviceId ? { ...c, stream, connected: true } : c,
+          c.deviceId === deviceId ? { ...c, stream: videoOnly, connected: true } : c,
         ))
       }
 

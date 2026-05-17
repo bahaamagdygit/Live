@@ -198,7 +198,7 @@ export function useCameras(): UseCamerasReturn {
         // triggers a devicechange event and interrupts the active camera stream.
         if (!streamRef.current) {
           try {
-            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
+              const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
             tempStream.getTracks().forEach((t) => t.stop())
           } catch (permErr: any) {
             // If permission is denied, enumerate anyway (devices will have empty labels)
@@ -232,7 +232,15 @@ export function useCameras(): UseCamerasReturn {
       }
 
       const hidden = hiddenIdsRef.current
-      const mergedRaw = browserDevices.length > 0 ? browserDevices : electronDevices
+      // Merge browser and electron devices, removing duplicates by deviceId
+      const allDevices = [...browserDevices, ...electronDevices]
+      const deviceMap = new Map<string, Camera>()
+      for (const cam of allDevices) {
+        if (!deviceMap.has(cam.deviceId)) {
+          deviceMap.set(cam.deviceId, cam)
+        }
+      }
+      const mergedRaw = Array.from(deviceMap.values())
       // Drop cameras the user has explicitly removed in the past.
       const merged = mergedRaw.filter(c => !hidden.has(c.deviceId))
 
