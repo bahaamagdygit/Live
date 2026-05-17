@@ -233,7 +233,6 @@ export function useCameras(): UseCamerasReturn {
         } catch (err) {}
       }
 
-      const hidden = hiddenIdsRef.current
       // Merge browser and electron devices, removing duplicates by deviceId
       const allDevices = [...browserDevices, ...electronDevices]
       const deviceMap = new Map<string, Camera>()
@@ -242,14 +241,12 @@ export function useCameras(): UseCamerasReturn {
           deviceMap.set(cam.deviceId, cam)
         }
       }
-      const mergedRaw = Array.from(deviceMap.values())
-      // Drop cameras the user has explicitly removed in the past.
-      const merged = mergedRaw.filter(c => !hidden.has(c.deviceId))
+      const merged = Array.from(deviceMap.values())
 
-      // Merge with existing manually-kept cameras (those not in the new list stay if user hasn't removed them)
+      // Merge with existing manually-kept cameras (those not in the new list stay)
       setCameras(prev => {
         const newIds = new Set(merged.map(c => c.deviceId))
-        const kept = prev.filter(c => !newIds.has(c.deviceId) && !hidden.has(c.deviceId))
+        const kept = prev.filter(c => !newIds.has(c.deviceId))
         return [...merged, ...kept]
       })
 

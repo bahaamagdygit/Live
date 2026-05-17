@@ -985,6 +985,13 @@ async function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 
+  // Enable F12 to open DevTools even in production
+  globalShortcut.register('F12', () => {
+    if (mainWindow) {
+      mainWindow.webContents.toggleDevTools()
+    }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
     stopAllProcesses()
