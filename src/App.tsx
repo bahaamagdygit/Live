@@ -357,8 +357,33 @@ function App() {
   // Reverse control: commands from mobile → act on desktop state.
   useEffect(() => {
     if (!window.electronAPI?.onMobileControl) return
-    return window.electronAPI.onMobileControl(({ action, value }) => {
+    return window.electronAPI.onMobileControl(({ deviceId, action, value }) => {
       switch (action) {
+        case 'filters': {
+          // Phone changed its preview filters → mirror them onto that phone's
+          // feed on the desktop output. The 8-field payload matches FilterState.
+          if (value && typeof value === 'object') {
+            const id = deviceId || activeMobileDeviceId
+            if (id) {
+              const v = value as Record<string, number>
+              const num = (k: string, def: number) =>
+                typeof v[k] === 'number' ? v[k] : def
+              mobileCameras.updateView(id, {
+                filters: {
+                  brightness: num('brightness', 100),
+                  contrast:   num('contrast', 100),
+                  saturation: num('saturation', 100),
+                  hue:        num('hue', 0),
+                  sepia:      num('sepia', 0),
+                  grayscale:  num('grayscale', 0),
+                  blur:       num('blur', 0),
+                  opacity:    num('opacity', 100),
+                },
+              })
+            }
+          }
+          break
+        }
         case 'select_camera': {
           const id = String(value ?? '')
           if (id.startsWith('usb:')) {
@@ -397,7 +422,7 @@ function App() {
         case 'cut_to_black':    setManualFallback(v => typeof value === 'boolean' ? value : !v); break
       }
     })
-  }, [cameras, slides, stream, settings.streamConfig])
+  }, [cameras, slides, stream, settings.streamConfig, mobileCameras, activeMobileDeviceId])
 
   // Listen for presentation window being closed externally
   useEffect(() => {
