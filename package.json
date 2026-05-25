@@ -63,13 +63,16 @@
     ],
     "win": {
       "target": "nsis",
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "signingHashAlgorithms": null,
       "sign": null
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     },
     "extraResources": [
       {

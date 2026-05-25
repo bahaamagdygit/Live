@@ -900,6 +900,29 @@ function getAppPath() {
   return isDev ? path.join(__dirname, '..') : path.join(process.resourcesPath)
 }
 
+/**
+ * Resolve the app icon across dev and packaged layouts. In dev it lives in
+ * public/; Vite copies public/ contents to dist/ root for the build, and we also
+ * keep a copy in build/. Return the first path that exists, or undefined so
+ * Electron falls back to its default rather than crashing on a missing file.
+ */
+function resolveIconPath(): string | undefined {
+  const candidates = isDev
+    ? [
+        path.join(__dirname, '..', 'public', 'icon.ico'),
+        path.join(__dirname, '..', 'build', 'icon.ico'),
+      ]
+    : [
+        path.join(__dirname, '..', 'dist', 'icon.ico'),
+        path.join(process.resourcesPath, 'public', 'icon.ico'),
+        path.join(app.getAppPath(), 'dist', 'icon.ico'),
+      ]
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p } catch {}
+  }
+  return undefined
+}
+
 async function createWindow() {
   await loadModules()
   if (!ipcHandlersRegistered) {
@@ -969,7 +992,7 @@ async function createWindow() {
     minHeight: 700,
     backgroundColor: '#0f0f1a',
     titleBarStyle: 'default',
-    icon: path.join(getAppPath(), 'public', 'icon.ico'),
+    icon: resolveIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
